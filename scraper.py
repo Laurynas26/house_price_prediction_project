@@ -2,7 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 
 # Example Funda detail page URL (replace with a real one from funda.nl)
-url = "https://www.funda.nl/koop/amsterdam/huis-1234567-example-street-1/"
+url = "https://www.funda.nl/detail/koop/amsterdam/appartement-bilderdijkkade-52-b/43944051/"
 
 # Set headers with a user-agent to mimic a real browser
 headers = {
