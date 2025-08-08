@@ -8,10 +8,12 @@ from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 import re
 from typing import Tuple, Dict, List, Optional, Any
+import json 
+import os
 
 
 class FundaScraper:
-    def __init__(self, url: str, headless: bool = True) -> None:
+    def __init__(self, url: str, headless: bool = True, selectors_path: str = "config/selectors.json") -> None:
         """
         Initialize the scraper with the target URL and browser mode.
 
@@ -24,6 +26,12 @@ class FundaScraper:
         self.driver: Optional[webdriver.Chrome] = None
         self.soup: Optional[BeautifulSoup] = None
         self.results: Dict[str, Any] = {}
+
+        # Load selectors JSON config
+        if not os.path.exists(selectors_path):
+            raise FileNotFoundError(f"Selectors file not found: {selectors_path}")
+        with open(selectors_path, "r", encoding="utf-8") as f:
+            self.selectors = json.load(f)
 
     def setup_driver(self) -> None:
         """
@@ -92,19 +100,27 @@ class FundaScraper:
         """
         assert self.soup is not None, "Soup is not initialized."
         size = bedrooms = energy_label = "N/A"
-        all_lis = self.soup.find_all("li", class_="flex")
+
+        config = self.selectors["size_bedrooms_energy"]
+        list_item_class = config["list_item_class"]
+        label_span_class = config["label_span_class"]
+        value_span_class = config["value_span_class"]
+        labels = config["labels"]
+
+
+        all_lis = self.soup.find_all("li", class_=list_item_class.split('.')[-1])  # assume last class from list_item_class
         for li in all_lis:
-            label = li.find("span", class_="ml-1")
-            value = li.find("span", class_="md:font-bold")
+            label = li.find("span", class_=label_span_class.split('.')[-1])
+            value = li.find("span", class_=value_span_class.split('.')[-1])
             if not label or not value:
                 continue
             label_text = label.get_text(strip=True).lower()
             value_text = value.get_text(strip=True)
-            if "wonen" in label_text:
+            if labels["size"] in label_text:
                 size = value_text
-            elif "slaapkamers" in label_text:
+            elif labels["bedrooms"] in label_text:
                 bedrooms = value_text
-            elif "energielabel" in label_text:
+            elif labels["energy_label"] in label_text:
                 energy_label = value_text
         return size, bedrooms, energy_label
 
@@ -115,24 +131,27 @@ class FundaScraper:
         Returns:
             Dict[str, str]: Neighborhood details.
         """
-        assert self.soup is not None, "Soup is not initialized."
+        config = self.selectors["neighborhood_details"]
+        container_selector = config["container_selector"]
+        labels = config["labels"]
+
         details = {
             "Inhabitants in neighborhood": "N/A",
             "Families with children": "N/A",
             "Price per m² in neighborhood": "N/A",
         }
-        divs = self.soup.select("div.flex.justify-between.border-b")
+        divs = self.soup.select(container_selector)
         for div in divs:
             dt = div.find("dt")
             dd = div.find("dd")
             if dt and dd:
                 label = dt.get_text(strip=True).lower()
                 value = dd.get_text(strip=True)
-                if "inwoners" in label:
+                if labels["inhabitants"] in label:
                     details["Inhabitants in neighborhood"] = value
-                elif "gezin met kinderen" in label:
+                elif labels["families_with_children"] in label:
                     details["Families with children"] = value
-                elif "gem. vraagprijs / m²" in label:
+                elif labels["price_per_m2"] in label:
                     details["Price per m² in neighborhood"] = value
         return details
 
@@ -188,9 +207,9 @@ class FundaScraper:
                 - charges list
         """
         assert self.soup is not None, "Soup is not initialized."
-        cadastral_section = self.soup.find(
-            "div", attrs={"data-testid": "category-cadastral"}
-        )
+        config = self.selectors["cadastral_info"]
+
+        cadastral_section = self.soup.find("div", attrs={"data-testid": config["section_data_testid"]})
         ownership_situations: List[str] = []
         charges: List[str] = []
         cadastral_parcels: List[Dict[str, Optional[str]]] = []
@@ -205,19 +224,17 @@ class FundaScraper:
                     continue
                 dd_text = dd.get_text(strip=True)
 
-                if "Eigendomssituatie" in dt_text:
+                if config["ownership_situation_label"] in dt_text:
                     ownership_situations.append(dd_text)
-                elif "Lasten" in dt_text:
+                elif config["charges_label"] in dt_text:
                     charges.append(dd_text)
-                elif "AMSTERDAM" in dt_text:
+                elif config["parcel_key"] in dt_text:
                     if dt_text not in added_parcels:
                         added_parcels.add(dt_text)
-                        cadastral_parcels.append(
-                            {
-                                "parcel": dt_text,
-                                "link": dd.find("a")["href"] if dd.find("a") else None,
-                            }
-                        )
+                        cadastral_parcels.append({
+                            "parcel": dt_text,
+                            "link": dd.find("a")["href"] if dd.find("a") else None,
+                        })
         return cadastral_parcels, ownership_situations, charges
 
     def parse_outdoor_features(self) -> Dict[str, Optional[str]]:
@@ -228,15 +245,10 @@ class FundaScraper:
             Dict[str, Optional[str]]: Outdoor features with keys 'Ligging', 'Tuin', 'Achtertuin', 'Ligging tuin'.
         """
         assert self.soup is not None, "Soup is not initialized."
-        outdoor_section = self.soup.find(
-            "div", attrs={"data-testid": "category-buitenruimte"}
-        )
-        features = {
-            "Ligging": None,
-            "Tuin": None,
-            "Achtertuin": None,
-            "Ligging tuin": None,
-        }
+        config = self.selectors["outdoor_features"]
+
+        outdoor_section = self.soup.find("div", attrs={"data-testid": config["section_data_testid"]})
+        features = {field: None for field in config["fields"]}
         if outdoor_section:
             dts = outdoor_section.find_all("dt")
             for dt in dts:
@@ -258,19 +270,12 @@ class FundaScraper:
             self.setup_driver()
             self.get_soup_from_url()
 
-            self.results["price"] = self.extract_text(
-                "div.flex.flex-col.text-xl div.flex.gap-2.font-bold span"
-            )
-            self.results["address"] = self.extract_text(
-                "h1[data-global-id] > span.block.font-bold"
-            )
-            self.results["postal_code"] = self.extract_text(
-                "h1[data-global-id] > span.text-neutral-40"
-            )
-            self.results["neighborhood"] = self.extract_text("h1[data-global-id] > a")
-            self.results["status"] = self.extract_text(
-                "div.flex.items-baseline > div.bg-red-70"
-            )
+            basic = self.selectors["basic"]
+            self.results["price"] = self.extract_text(basic["price"])
+            self.results["address"] = self.extract_text(basic["address"])
+            self.results["postal_code"] = self.extract_text(basic["postal_code"])
+            self.results["neighborhood"] = self.extract_text(basic["neighborhood"])
+            self.results["status"] = self.extract_text(basic["status"])
 
             size, bedrooms, energy_label = self.parse_size_bedrooms_energy()
             self.results["size"] = size
@@ -279,31 +284,26 @@ class FundaScraper:
 
             self.results["neighborhood_details"] = self.parse_neighborhood_details()
 
-            self.results["contribution"] = self.extract_dd_by_dt_label("Bijdrage VvE")
-            self.results["year_of_construction"] = self.extract_dd_by_dt_label(
-                "Bouwjaar"
-            )
-            self.results["roof_type"] = self.extract_dd_by_dt_label("Soort dak")
-            self.results["living_area"] = self.extract_dd_by_dt_label("Wonen")
-            self.results["external_storage"] = self.extract_dd_by_dt_label(
-                "Externe bergruimte"
-            )
-            self.results["balcony"] = self.extract_dd_by_dt_label("Balkon/dakterras")
+            dl_labels = self.selectors["dl_labels"]
+            self.results["contribution"] = self.extract_dd_by_dt_label(dl_labels["contribution_vve"])
+            self.results["year_of_construction"] = self.extract_dd_by_dt_label(dl_labels["year_of_construction"])
+            self.results["roof_type"] = self.extract_dd_by_dt_label(dl_labels["roof_type"])
+            self.results["living_area"] = self.extract_dd_by_dt_label(dl_labels["living_area"])
+            self.results["external_storage"] = self.extract_dd_by_dt_label(dl_labels["external_storage"])
+            self.results["balcony"] = self.extract_dd_by_dt_label(dl_labels["balcony"])
 
-            rooms_info = self.extract_dd_by_dt_label("Aantal kamers")
+            rooms_info = self.extract_dd_by_dt_label(dl_labels["rooms_info"])
             self.results["nr_rooms"] = self.parse_rooms_info(rooms_info)
 
-            bathrooms_info = self.extract_dd_by_dt_label("Aantal badkamers")
+            bathrooms_info = self.extract_dd_by_dt_label(dl_labels["bathrooms_info"])
             bathrooms, toilets = self.parse_bathrooms_and_toilets(bathrooms_info)
             self.results["bathrooms"] = bathrooms
             self.results["toilets"] = toilets
 
-            self.results["located_on"] = self.extract_dd_by_dt_label("Gelegen op")
-            self.results["facilities"] = self.extract_dd_by_dt_label("Voorzieningen")
+            self.results["located_on"] = self.extract_dd_by_dt_label(dl_labels["located_on"])
+            self.results["facilities"] = self.extract_dd_by_dt_label(dl_labels["facilities"])
 
-            cadastral_parcels, ownership_situations, charges = (
-                self.parse_cadastral_info()
-            )
+            cadastral_parcels, ownership_situations, charges = self.parse_cadastral_info()
             self.results["cadastral_parcels"] = cadastral_parcels
             self.results["ownership_situations"] = ownership_situations
             self.results["charges"] = charges
@@ -331,9 +331,12 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s - %(levelname)s - %(message)s",
                         )
-    urls = [
-        "https://www.funda.nl/detail/koop/amsterdam/appartement-bilderdijkkade-52-b/43944051/",
-    ]
+    logging.info("Starting scraper script...")
+    # urls = [
+    #     "https://www.funda.nl/detail/koop/amsterdam/appartement-bilderdijkkade-52-b/43944051/",
+    # ]
+    with open("config/house_pages.txt", "r", encoding="utf-8") as f: 
+        urls = [line.strip() for line in f if line.strip()]
     for url in urls:
         if can_scrape(url):
             logging.info(f"Scraping allowed for {url}")
