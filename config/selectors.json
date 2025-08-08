@@ -1,0 +1,49 @@
+{
+  "basic": {
+    "price": "div.flex.flex-col.text-xl div.flex.gap-2.font-bold span",
+    "address": "h1[data-global-id] > span.block.font-bold",
+    "postal_code": "h1[data-global-id] > span.text-neutral-40",
+    "neighborhood": "h1[data-global-id] > a",
+    "status": "div.flex.items-baseline > div.bg-red-70"
+  },
+  "size_bedrooms_energy": {
+    "list_item_class": "li.flex",
+    "label_span_class": "span.ml-1",
+    "value_span_class": "span.md:font-bold",
+    "labels": {
+      "size": "wonen",
+      "bedrooms": "slaapkamers",
+      "energy_label": "energielabel"
+    }
+  },
+  "neighborhood_details": {
+    "container_selector": "div.flex.justify-between.border-b",
+    "labels": {
+      "inhabitants": "inwoners",
+      "families_with_children": "gezin met kinderen",
+      "price_per_m2": "gem. vraagprijs / m²"
+    }
+  },
+  "dl_labels": {
+    "contribution_vve": "Bijdrage VvE",
+    "year_of_construction": "Bouwjaar",
+    "roof_type": "Soort dak",
+    "living_area": "Wonen",
+    "external_storage": "Externe bergruimte",
+    "balcony": "Balkon/dakterras",
+    "rooms_info": "Aantal kamers",
+    "bathrooms_info": "Aantal badkamers",
+    "located_on": "Gelegen op",
+    "facilities": "Voorzieningen"
+  },
+  "cadastral_info": {
+    "section_data_testid": "category-cadastral",
+    "ownership_situation_label": "Eigendomssituatie",
+    "charges_label": "Lasten",
+    "parcel_key": "AMSTERDAM"
+  },
+  "outdoor_features": {
+    "section_data_testid": "category-buitenruimte",
+    "fields": ["Ligging", "Tuin", "Achtertuin", "Ligging tuin"]
+  }
+}
