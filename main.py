@@ -7,7 +7,7 @@ from src.scraper.logging_config import setup_logging
 if __name__ == "__main__":
     setup_logging()
 
-    urls_path = "config/house_pages.txt"
+    urls_path = "config/house_pages_scraped.txt"
     selectors_path = "config/selectors.json"
 
     max_retries = 3
@@ -15,7 +15,12 @@ if __name__ == "__main__":
     with open(urls_path, "r", encoding="utf-8") as f:
         urls = [line.strip() for line in f if line.strip()]
 
-    for url in urls:
+    # Only Amsterdam apartments first
+    amsterdam_urls = [url for url in urls if "/amsterdam/appartement" in url]
+
+    amsterdam_urls = amsterdam_urls[:16]
+
+    for url in amsterdam_urls:
         if can_scrape(url):
             logging.info(f"Scraping allowed for {url}")
 
@@ -25,7 +30,9 @@ if __name__ == "__main__":
 
                 # Check if all parsed values are "N/A"
                 if all(value == "N/A" for value in results.values()):
-                    logging.warning(f"Attempt {attempt} for {url} returned all N/A. Retrying...")
+                    logging.warning(
+                        f"Attempt {attempt} for {url} returned all N/A. Retrying..."
+                    )
                     time.sleep(3)  # wait before retrying
                 else:
                     if scraper.soup:
@@ -34,9 +41,10 @@ if __name__ == "__main__":
                         logging.warning(f"No HTML soup extracted for {url}")
                     break  # exit retry loop on success
             else:
-                logging.error(f"Failed to get valid data from {url} after {max_retries} attempts.")
-            
+                logging.error(
+                    f"Failed to get valid data from {url} after {max_retries} attempts."
+                )
+
             time.sleep(2)
         else:
             logging.warning(f"Scraping not allowed for {url}")
-
