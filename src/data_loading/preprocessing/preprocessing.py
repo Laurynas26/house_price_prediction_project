@@ -1,4 +1,3 @@
-import pandas as pd
 from .facilities_details import (
     preprocess_facilities_column,
     preprocess_outdoor_features_column,
@@ -10,7 +9,7 @@ from .cadastral_info import (
 )
 from .neighborhood_statistics import expand_neighborhood_details_column
 from .postal_city_details import preprocess_postal_city_column
-from .utils import parse_price, parse_size, split_postal_city
+from .utils import parse_price, parse_size
 
 
 def preprocess_df(df):

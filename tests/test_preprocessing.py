@@ -1,5 +1,4 @@
 import pandas as pd
-import pytest
 from src.data_loading.preprocessing.preprocessing import preprocess_df
 from src.data_loading.preprocessing.neighborhood_statistics import (
     preprocess_neighborhood_details,
