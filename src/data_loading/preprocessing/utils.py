@@ -33,7 +33,7 @@ def to_float_pct(s):
         return pd.NA
     digits = re.sub(r"[^\d]", "", s)
     try:
-        return float(digits) if digits else pd.NA
+        return float(digits) / 100 if digits else pd.NA
     except ValueError:
         return pd.NA
 
