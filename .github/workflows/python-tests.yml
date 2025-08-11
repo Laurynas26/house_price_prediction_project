@@ -32,9 +32,10 @@ jobs:
       #   run: |
       #     mypy src/ tests/
 
-      - name: Install package
-        run: pip install -e .
+      # - name: Install package
+      #   run: pip install -e .
 
       - name: Run tests
         run: |
+          set PYTHONPATH=%PYTHONPATH%;src
           pytest tests/
