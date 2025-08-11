@@ -32,6 +32,9 @@ jobs:
       #   run: |
       #     mypy src/ tests/
 
+      - name: Install package
+        run: pip install -e .
+
       - name: Run tests
         run: |
           pytest tests/
