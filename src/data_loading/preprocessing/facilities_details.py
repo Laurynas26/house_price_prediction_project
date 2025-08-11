@@ -20,13 +20,16 @@ def preprocess_facilities(facilities_str):
 
 def create_facilities_features(df, key_facilities=None):
     """
-    Given a DataFrame with a 'facilities_list' column, create binary indicator columns for each facility.
+    Given a DataFrame with a 'facilities_list' column,
+    create binary indicator columns for each facility.
 
     If key_facilities is None, use the most common facilities in the dataset.
     """
     if key_facilities is None:
         # Get list of unique facilities sorted by frequency
-        key_facilities = df["facilities_list"].explode().value_counts().index.tolist()
+        key_facilities = (
+            df["facilities_list"].explode().value_counts().index.tolist()
+        )
 
     for facility in key_facilities:
         col_name = f"has_{facility.replace(' ', '_')}"
@@ -49,10 +52,12 @@ def preprocess_outdoor_features(outdoor_dict):
     Clean and standardize the outdoor features dictionary.
 
     Args:
-        outdoor_dict (dict): e.g. {'Ligging': 'In woonwijk', 'Tuin': None, 'Achtertuin': None, 'Ligging tuin': None}
+        outdoor_dict (dict): e.g. {'Ligging': 'In woonwijk', 'Tuin': None, 
+        'Achtertuin': None, 'Ligging tuin': None}
 
     Returns:
-        dict: cleaned features with standardized keys and values or pd.NA for missing.
+        dict: cleaned features with standardized keys and values 
+        or pd.NA for missing.
     """
     import pandas as pd
 
@@ -93,7 +98,9 @@ def preprocess_outdoor_features_column(df):
     Apply outdoor features preprocessing and add as new columns.
     """
     df_outdoor = (
-        df["outdoor_features"].apply(preprocess_outdoor_features).apply(pd.Series)
+        df["outdoor_features"]
+        .apply(preprocess_outdoor_features)
+        .apply(pd.Series)
     )
     df = pd.concat([df.drop(columns=["outdoor_features"]), df_outdoor], axis=1)
     return df

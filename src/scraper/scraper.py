@@ -6,18 +6,24 @@ from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 import re
 from typing import Tuple, Dict, List, Optional, Any
-import json 
+import json
 import os
 
 
 class FundaScraper:
-    def __init__(self, url: str, headless: bool = True, selectors_path: str = "config/selectors.json") -> None:
+    def __init__(
+        self,
+        url: str,
+        headless: bool = True,
+        selectors_path: str = "config/selectors.json",
+    ) -> None:
         """
         Initialize the scraper with the target URL and browser mode.
 
         Args:
             url (str): The URL of the listing to scrape.
-            headless (bool, optional): Whether to run Chrome in headless mode. Defaults to True.
+            headless (bool, optional): Whether to run Chrome in headless mode.
+            Defaults to True.
         """
         self.url: str = url
         self.headless: bool = headless
@@ -27,7 +33,9 @@ class FundaScraper:
 
         # Load selectors JSON config
         if not os.path.exists(selectors_path):
-            raise FileNotFoundError(f"Selectors file not found: {selectors_path}")
+            raise FileNotFoundError(
+                f"Selectors file not found: {selectors_path}"
+            )
         with open(selectors_path, "r", encoding="utf-8") as f:
             self.selectors = json.load(f)
 
@@ -55,7 +63,8 @@ class FundaScraper:
 
         Args:
             selector (str): CSS selector to find element.
-            default (str, optional): Default text if element not found. Defaults to "N/A".
+            default (str, optional): Default text if element not found. 
+            Defaults to "N/A".
 
         Returns:
             str: Extracted text or default.
@@ -68,19 +77,24 @@ class FundaScraper:
         self, label_text: str, exact_match: bool = False, default: str = "N/A"
     ) -> str:
         """
-        Extract text from the <dd> element that follows a <dt> matching label_text.
+        Extract text from the <dd> element that follows 
+        a <dt> matching label_text.
 
         Args:
             label_text (str): Text label to find in <dt>.
-            exact_match (bool, optional): Whether match must be exact. Defaults to False.
-            default (str, optional): Default text if not found. Defaults to "N/A".
+            exact_match (bool, optional): Whether match must be exact. 
+            Defaults to False.
+            default (str, optional): Default text if not found. 
+            Defaults to "N/A".
 
         Returns:
             str: Extracted text or default.
         """
         assert self.soup is not None, "Soup is not initialized."
         if exact_match:
-            dt = self.soup.find("dt", string=lambda s: s and s.strip() == label_text)
+            dt = self.soup.find(
+                "dt", string=lambda s: s and s.strip() == label_text
+            )
         else:
             dt = self.soup.find("dt", string=lambda s: s and label_text in s)
         if dt:
@@ -105,11 +119,12 @@ class FundaScraper:
         value_span_class = config["value_span_class"]
         labels = config["labels"]
 
-
-        all_lis = self.soup.find_all("li", class_=list_item_class.split('.')[-1])  # assume last class from list_item_class
+        all_lis = self.soup.find_all(
+            "li", class_=list_item_class.split(".")[-1]
+        )  # assume last class from list_item_class
         for li in all_lis:
-            label = li.find("span", class_=label_span_class.split('.')[-1])
-            value = li.find("span", class_=value_span_class.split('.')[-1])
+            label = li.find("span", class_=label_span_class.split(".")[-1])
+            value = li.find("span", class_=value_span_class.split(".")[-1])
             if not label or not value:
                 continue
             label_text = label.get_text(strip=True).lower()
@@ -124,7 +139,8 @@ class FundaScraper:
 
     def parse_neighborhood_details(self) -> Dict[str, str]:
         """
-        Parse neighborhood details such as inhabitants, families with children, and price per m².
+        Parse neighborhood details such as inhabitants, families with children,
+        and price per m².
 
         Returns:
             Dict[str, str]: Neighborhood details.
@@ -170,7 +186,9 @@ class FundaScraper:
                 nr_rooms = match.group(1)
         return nr_rooms
 
-    def parse_bathrooms_and_toilets(self, info_text: Optional[str]) -> Tuple[str, str]:
+    def parse_bathrooms_and_toilets(
+        self, info_text: Optional[str]
+    ) -> Tuple[str, str]:
         """
         Extract number of bathrooms and separate toilets from text.
 
@@ -207,7 +225,9 @@ class FundaScraper:
         assert self.soup is not None, "Soup is not initialized."
         config = self.selectors["cadastral_info"]
 
-        cadastral_section = self.soup.find("div", attrs={"data-testid": config["section_data_testid"]})
+        cadastral_section = self.soup.find(
+            "div", attrs={"data-testid": config["section_data_testid"]}
+        )
         ownership_situations: List[str] = []
         charges: List[str] = []
         cadastral_parcels: List[Dict[str, Optional[str]]] = []
@@ -229,10 +249,16 @@ class FundaScraper:
                 elif config["parcel_key"] in dt_text:
                     if dt_text not in added_parcels:
                         added_parcels.add(dt_text)
-                        cadastral_parcels.append({
-                            "parcel": dt_text,
-                            "link": dd.find("a")["href"] if dd.find("a") else None,
-                        })
+                        cadastral_parcels.append(
+                            {
+                                "parcel": dt_text,
+                                "link": (
+                                    dd.find("a")["href"]
+                                    if dd.find("a")
+                                    else None
+                                ),
+                            }
+                        )
         return cadastral_parcels, ownership_situations, charges
 
     def parse_outdoor_features(self) -> Dict[str, Optional[str]]:
@@ -240,12 +266,15 @@ class FundaScraper:
         Parse outdoor features like garden and location.
 
         Returns:
-            Dict[str, Optional[str]]: Outdoor features with keys 'Ligging', 'Tuin', 'Achtertuin', 'Ligging tuin'.
+            Dict[str, Optional[str]]: Outdoor features with keys 'Ligging',
+            'Tuin', 'Achtertuin', 'Ligging tuin'.
         """
         assert self.soup is not None, "Soup is not initialized."
         config = self.selectors["outdoor_features"]
 
-        outdoor_section = self.soup.find("div", attrs={"data-testid": config["section_data_testid"]})
+        outdoor_section = self.soup.find(
+            "div", attrs={"data-testid": config["section_data_testid"]}
+        )
         features = {field: None for field in config["fields"]}
         if outdoor_section:
             dts = outdoor_section.find_all("dt")
@@ -258,7 +287,8 @@ class FundaScraper:
 
     def run(self) -> Dict[str, Any]:
         """
-        Run the scraper: setup driver, fetch page, parse all info, and quit driver.
+        Run the scraper: 
+        setup driver, fetch page, parse all info, and quit driver.
 
         Returns:
             Dict[str, Any]: Dictionary with all scraped results.
@@ -271,8 +301,12 @@ class FundaScraper:
             basic = self.selectors["basic"]
             self.results["price"] = self.extract_text(basic["price"])
             self.results["address"] = self.extract_text(basic["address"])
-            self.results["postal_code"] = self.extract_text(basic["postal_code"])
-            self.results["neighborhood"] = self.extract_text(basic["neighborhood"])
+            self.results["postal_code"] = self.extract_text(
+                basic["postal_code"]
+            )
+            self.results["neighborhood"] = self.extract_text(
+                basic["neighborhood"]
+            )
             self.results["status"] = self.extract_text(basic["status"])
 
             size, bedrooms, energy_label = self.parse_size_bedrooms_energy()
@@ -280,28 +314,52 @@ class FundaScraper:
             self.results["bedrooms"] = bedrooms
             self.results["energy_label"] = energy_label
 
-            self.results["neighborhood_details"] = self.parse_neighborhood_details()
+            self.results["neighborhood_details"] = (
+                self.parse_neighborhood_details()
+            )
 
             dl_labels = self.selectors["dl_labels"]
-            self.results["contribution"] = self.extract_dd_by_dt_label(dl_labels["contribution_vve"])
-            self.results["year_of_construction"] = self.extract_dd_by_dt_label(dl_labels["year_of_construction"])
-            self.results["roof_type"] = self.extract_dd_by_dt_label(dl_labels["roof_type"])
-            self.results["living_area"] = self.extract_dd_by_dt_label(dl_labels["living_area"])
-            self.results["external_storage"] = self.extract_dd_by_dt_label(dl_labels["external_storage"])
-            self.results["balcony"] = self.extract_dd_by_dt_label(dl_labels["balcony"])
+            self.results["contribution"] = self.extract_dd_by_dt_label(
+                dl_labels["contribution_vve"]
+            )
+            self.results["year_of_construction"] = self.extract_dd_by_dt_label(
+                dl_labels["year_of_construction"]
+            )
+            self.results["roof_type"] = self.extract_dd_by_dt_label(
+                dl_labels["roof_type"]
+            )
+            self.results["living_area"] = self.extract_dd_by_dt_label(
+                dl_labels["living_area"]
+            )
+            self.results["external_storage"] = self.extract_dd_by_dt_label(
+                dl_labels["external_storage"]
+            )
+            self.results["balcony"] = self.extract_dd_by_dt_label(
+                dl_labels["balcony"]
+            )
 
             rooms_info = self.extract_dd_by_dt_label(dl_labels["rooms_info"])
             self.results["nr_rooms"] = self.parse_rooms_info(rooms_info)
 
-            bathrooms_info = self.extract_dd_by_dt_label(dl_labels["bathrooms_info"])
-            bathrooms, toilets = self.parse_bathrooms_and_toilets(bathrooms_info)
+            bathrooms_info = self.extract_dd_by_dt_label(
+                dl_labels["bathrooms_info"]
+            )
+            bathrooms, toilets = self.parse_bathrooms_and_toilets(
+                bathrooms_info
+            )
             self.results["bathrooms"] = bathrooms
             self.results["toilets"] = toilets
 
-            self.results["located_on"] = self.extract_dd_by_dt_label(dl_labels["located_on"])
-            self.results["facilities"] = self.extract_dd_by_dt_label(dl_labels["facilities"])
+            self.results["located_on"] = self.extract_dd_by_dt_label(
+                dl_labels["located_on"]
+            )
+            self.results["facilities"] = self.extract_dd_by_dt_label(
+                dl_labels["facilities"]
+            )
 
-            cadastral_parcels, ownership_situations, charges = self.parse_cadastral_info()
+            cadastral_parcels, ownership_situations, charges = (
+                self.parse_cadastral_info()
+            )
             self.results["cadastral_parcels"] = cadastral_parcels
             self.results["ownership_situations"] = ownership_situations
             self.results["charges"] = charges
