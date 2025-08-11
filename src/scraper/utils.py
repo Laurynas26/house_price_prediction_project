@@ -12,7 +12,8 @@ def can_scrape(url: str, user_agent: str = "*") -> bool:
 
     Args:
         url (str): The URL to check.
-        user_agent (str, optional): User agent to check permissions for. Defaults to "*".
+        user_agent (str, optional): User agent to check permissions for.
+        Defaults to "*".
 
     Returns:
         bool: True if scraping is allowed, False otherwise.
@@ -52,7 +53,8 @@ def save_results(
         raw_html (str): The raw HTML content as a string.
         parsed_data (dict): The parsed results.
         url (str): The source URL (used for unique ID generation).
-        output_dir (str, optional): Base directory to store results. Defaults to "data".
+        output_dir (str, optional): Base directory to store results.
+        Defaults to "data".
     """
     html_dir = os.path.join(output_dir, "raw_html")
     json_dir = os.path.join(output_dir, "parsed_json")

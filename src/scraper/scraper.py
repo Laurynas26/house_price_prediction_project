@@ -22,7 +22,8 @@ class FundaScraper:
 
         Args:
             url (str): The URL of the listing to scrape.
-            headless (bool, optional): Whether to run Chrome in headless mode. Defaults to True.
+            headless (bool, optional): Whether to run Chrome in headless mode.
+            Defaults to True.
         """
         self.url: str = url
         self.headless: bool = headless
@@ -62,7 +63,8 @@ class FundaScraper:
 
         Args:
             selector (str): CSS selector to find element.
-            default (str, optional): Default text if element not found. Defaults to "N/A".
+            default (str, optional): Default text if element not found. 
+            Defaults to "N/A".
 
         Returns:
             str: Extracted text or default.
@@ -79,8 +81,10 @@ class FundaScraper:
 
         Args:
             label_text (str): Text label to find in <dt>.
-            exact_match (bool, optional): Whether match must be exact. Defaults to False.
-            default (str, optional): Default text if not found. Defaults to "N/A".
+            exact_match (bool, optional): Whether match must be exact. 
+            Defaults to False.
+            default (str, optional): Default text if not found. 
+            Defaults to "N/A".
 
         Returns:
             str: Extracted text or default.
@@ -134,7 +138,8 @@ class FundaScraper:
 
     def parse_neighborhood_details(self) -> Dict[str, str]:
         """
-        Parse neighborhood details such as inhabitants, families with children, and price per m².
+        Parse neighborhood details such as inhabitants, families with children,
+        and price per m².
 
         Returns:
             Dict[str, str]: Neighborhood details.
@@ -260,7 +265,8 @@ class FundaScraper:
         Parse outdoor features like garden and location.
 
         Returns:
-            Dict[str, Optional[str]]: Outdoor features with keys 'Ligging', 'Tuin', 'Achtertuin', 'Ligging tuin'.
+            Dict[str, Optional[str]]: Outdoor features with keys 'Ligging',
+            'Tuin', 'Achtertuin', 'Ligging tuin'.
         """
         assert self.soup is not None, "Soup is not initialized."
         config = self.selectors["outdoor_features"]
@@ -280,7 +286,8 @@ class FundaScraper:
 
     def run(self) -> Dict[str, Any]:
         """
-        Run the scraper: setup driver, fetch page, parse all info, and quit driver.
+        Run the scraper: 
+        setup driver, fetch page, parse all info, and quit driver.
 
         Returns:
             Dict[str, Any]: Dictionary with all scraped results.
