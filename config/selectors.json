@@ -12,7 +12,7 @@
     "value_span_class": "span.md:font-bold",
     "labels": {
       "size": "wonen",
-      "bedrooms": "slaapkamers",
+      "bedrooms": "slaapkamer",
       "energy_label": "energielabel"
     }
   },
