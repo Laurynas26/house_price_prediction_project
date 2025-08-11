@@ -1,11 +1,15 @@
 import pandas as pd
-from .neighborhood_statistics import preprocess_neighborhood_details
+from .neighborhood_statistics import expand_neighborhood_details_column
+from .postal_city_details import preprocess_postal_city_column
+from .utils import parse_price, parse_size, split_postal_city
 
 def preprocess_df(df):
-    # Apply the neighborhood details preprocessing and expand the dict into columns
-    df_neigh = df["neighborhood_details"].apply(preprocess_neighborhood_details).apply(pd.Series)
+    df["price_num"] = df["price"].apply(parse_price)
+    df["size_num"] = df["size"].apply(parse_size)
 
-    # Drop the original nested column and concat the new cleaned columns
-    df = pd.concat([df.drop(columns=["neighborhood_details"]), df_neigh], axis=1)
+    df = preprocess_postal_city_column(df)
+
+    df = expand_neighborhood_details_column(df)
+
 
     return df
