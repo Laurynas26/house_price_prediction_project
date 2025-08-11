@@ -5,13 +5,20 @@ def preprocess_cadastral_parcels(parcels):
     if not isinstance(parcels, list):
         return {"num_parcels": 0, "parcels_concat": ""}
 
-    parcel_names = [p.get("parcel", "") for p in parcels if isinstance(p, dict)]
-    return {"num_parcels": len(parcel_names), "parcels_concat": "; ".join(parcel_names)}
+    parcel_names = [
+        p.get("parcel", "") for p in parcels if isinstance(p, dict)
+    ]
+    return {
+        "num_parcels": len(parcel_names),
+        "parcels_concat": "; ".join(parcel_names),
+    }
 
 
 def preprocess_cadastral_column(df):
     df_cad = (
-        df["cadastral_parcels"].apply(preprocess_cadastral_parcels).apply(pd.Series)
+        df["cadastral_parcels"]
+        .apply(preprocess_cadastral_parcels)
+        .apply(pd.Series)
     )
     df = pd.concat([df.drop(columns=["cadastral_parcels"]), df_cad], axis=1)
     return df

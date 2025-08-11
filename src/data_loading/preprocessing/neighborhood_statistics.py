@@ -24,7 +24,9 @@ def preprocess_neighborhood_details(neighborhood_details):
         }
 
     return {
-        "inhabitants_in_neighborhood": to_int(neighborhood_details.get("Inhabitants in neighborhood")),
+        "inhabitants_in_neighborhood": to_int(
+            neighborhood_details.get("Inhabitants in neighborhood")
+        ),
         "families_with_children_pct": to_float_pct(
             neighborhood_details.get("Families with children")
         ),
@@ -33,12 +35,19 @@ def preprocess_neighborhood_details(neighborhood_details):
         ),
     }
 
+
 def expand_neighborhood_details_column(df):
     """
     Takes a DataFrame with a 'neighborhood_details' column of dicts,
     applies preprocessing, expands the dict into separate columns,
     drops the original nested column, and returns the modified df.
     """
-    df_neigh = df["neighborhood_details"].apply(preprocess_neighborhood_details).apply(pd.Series)
-    df = pd.concat([df.drop(columns=["neighborhood_details"]), df_neigh], axis=1).reset_index(drop=True)
+    df_neigh = (
+        df["neighborhood_details"]
+        .apply(preprocess_neighborhood_details)
+        .apply(pd.Series)
+    )
+    df = pd.concat(
+        [df.drop(columns=["neighborhood_details"]), df_neigh], axis=1
+    ).reset_index(drop=True)
     return df

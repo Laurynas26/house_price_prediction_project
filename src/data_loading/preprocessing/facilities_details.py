@@ -26,7 +26,9 @@ def create_facilities_features(df, key_facilities=None):
     """
     if key_facilities is None:
         # Get list of unique facilities sorted by frequency
-        key_facilities = df["facilities_list"].explode().value_counts().index.tolist()
+        key_facilities = (
+            df["facilities_list"].explode().value_counts().index.tolist()
+        )
 
     for facility in key_facilities:
         col_name = f"has_{facility.replace(' ', '_')}"
@@ -93,7 +95,9 @@ def preprocess_outdoor_features_column(df):
     Apply outdoor features preprocessing and add as new columns.
     """
     df_outdoor = (
-        df["outdoor_features"].apply(preprocess_outdoor_features).apply(pd.Series)
+        df["outdoor_features"]
+        .apply(preprocess_outdoor_features)
+        .apply(pd.Series)
     )
     df = pd.concat([df.drop(columns=["outdoor_features"]), df_outdoor], axis=1)
     return df

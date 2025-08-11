@@ -18,7 +18,9 @@ def can_scrape(url: str, user_agent: str = "*") -> bool:
         bool: True if scraping is allowed, False otherwise.
     """
     rp = RobotFileParser()
-    base_url_parts = url.split("/", 3)[:3]  # e.g. ['https:', '', 'www.funda.nl']
+    base_url_parts = url.split("/", 3)[
+        :3
+    ]  # e.g. ['https:', '', 'www.funda.nl']
     base_url = "/".join(base_url_parts)
     rp.set_url(base_url + "/robots.txt")
     rp.read()
@@ -40,7 +42,9 @@ def generate_id_from_url(url: str) -> str:
     return f"{hash_id}_{timestamp}"
 
 
-def save_results(raw_html: str, parsed_data: dict, url: str, output_dir: str = "data"):
+def save_results(
+    raw_html: str, parsed_data: dict, url: str, output_dir: str = "data"
+):
     """
     Save raw HTML and parsed JSON into separate folders inside output_dir.
 
