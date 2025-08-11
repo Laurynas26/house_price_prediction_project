@@ -59,7 +59,8 @@ def safe_to_float_currency(s):
 
 def parse_price(price_str):
     """
-    Convert price string to int, allowing currency symbols and thousand separators.
+    Convert price string to int, allowing currency symbols 
+    and thousand separators.
     """
     if pd.isna(price_str):
         return pd.NA

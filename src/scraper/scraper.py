@@ -77,7 +77,8 @@ class FundaScraper:
         self, label_text: str, exact_match: bool = False, default: str = "N/A"
     ) -> str:
         """
-        Extract text from the <dd> element that follows a <dt> matching label_text.
+        Extract text from the <dd> element that follows 
+        a <dt> matching label_text.
 
         Args:
             label_text (str): Text label to find in <dt>.
