@@ -19,7 +19,7 @@ def preprocess_neighborhood_details(neighborhood_details):
     if not isinstance(neighborhood_details, dict):
         return {
             "inhabitants_in_neighborhood": pd.NA,
-            "families_with_children": pd.NA,
+            "families_with_children_pct": pd.NA,
             "price_per_m2": pd.NA,
         }
 
