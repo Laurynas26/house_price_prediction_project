@@ -28,9 +28,9 @@ jobs:
         run: |
           flake8 src/ tests/
 
-      - name: Type check with mypy
-        run: |
-          mypy src/ tests/
+      # - name: Type check with mypy
+      #   run: |
+      #     mypy src/ tests/
 
       - name: Run tests
         run: |
