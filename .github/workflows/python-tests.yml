@@ -35,7 +35,9 @@ jobs:
       # - name: Install package
       #   run: pip install -e .
 
+          
       - name: Run tests
+        shell: powershell
         run: |
-          set PYTHONPATH=%PYTHONPATH%;src
+          $env:PYTHONPATH = "$env:PYTHONPATH;src"
           pytest tests/
