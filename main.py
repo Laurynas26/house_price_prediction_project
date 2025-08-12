@@ -18,7 +18,7 @@ if __name__ == "__main__":
     # Only Amsterdam apartments first
     amsterdam_urls = [url for url in urls if "/amsterdam/appartement" in url]
 
-    amsterdam_urls = amsterdam_urls[:16]
+    amsterdam_urls = amsterdam_urls[:50]
 
     for url in amsterdam_urls:
         if can_scrape(url):
