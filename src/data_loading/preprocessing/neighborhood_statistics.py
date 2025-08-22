@@ -20,8 +20,10 @@ def preprocess_neighborhood_details(neighborhood_details):
         return {
             "inhabitants_in_neighborhood": pd.NA,
             "families_with_children_pct": pd.NA,
-            "price_per_m2": pd.NA,
+            "price_per_m2_neighborhood": pd.NA,
         }
+
+    price_str = neighborhood_details.get("Price per m² in neighborhood")
 
     return {
         "inhabitants_in_neighborhood": to_int(
@@ -30,8 +32,8 @@ def preprocess_neighborhood_details(neighborhood_details):
         "families_with_children_pct": to_float_pct(
             neighborhood_details.get("Families with children")
         ),
-        "price_per_m2": to_int(
-            neighborhood_details.get("Price per m² in neighborhood")
+        "price_per_m2_neighborhood": (
+            to_float_pct(price_str) * 100 if price_str is not None else pd.NA
         ),
     }
 
