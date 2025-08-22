@@ -14,7 +14,7 @@ def test_preprocess_neighborhood_details_valid():
     result = preprocess_neighborhood_details(input_data)
     assert result["inhabitants_in_neighborhood"] == 1830
     assert abs(result["families_with_children_pct"] - 0.38) < 1e-6
-    assert result["price_per_m2"] == 5990
+    assert result["price_per_m2_neighborhood"] == 5990
 
 
 def test_preprocess_neighborhood_details_invalid():
@@ -22,7 +22,7 @@ def test_preprocess_neighborhood_details_invalid():
     result = preprocess_neighborhood_details(None)
     assert pd.isna(result["inhabitants_in_neighborhood"])
     assert pd.isna(result["families_with_children_pct"])
-    assert pd.isna(result["price_per_m2"])
+    assert pd.isna(result["price_per_m2_neighborhood"])
 
 
 def test_preprocess_df_basic():
@@ -67,7 +67,7 @@ def test_preprocess_df_basic():
     # Check neighborhood details expanded
     assert cleaned_df.loc[0, "inhabitants_in_neighborhood"] == 1000
     assert abs(cleaned_df.loc[0, "families_with_children_pct"] - 0.20) < 1e-6
-    assert cleaned_df.loc[0, "price_per_m2"] == 5000
+    assert cleaned_df.loc[0, "price_per_m2_neighborhood"] == 5000
 
     # Check facilities_list column created
     assert isinstance(cleaned_df.loc[0, "facilities_list"], list)
