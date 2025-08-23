@@ -3,6 +3,9 @@ from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
 import re
 from typing import Tuple, Dict, List, Optional, Any
@@ -48,12 +51,30 @@ class FundaScraper:
         service = Service(ChromeDriverManager().install())
         self.driver = webdriver.Chrome(service=service, options=options)
 
+    # def get_soup_from_url(self) -> None:
+    #     """
+    #     Load the page and parse its HTML with BeautifulSoup.
+    #     """
+    #     assert self.driver is not None, "Driver is not initialized."
+    #     self.driver.get(self.url)
+    #     html = self.driver.page_source
+    #     self.soup = BeautifulSoup(html, "html.parser")
+
     def get_soup_from_url(self) -> None:
         """
         Load the page and parse its HTML with BeautifulSoup.
         """
         assert self.driver is not None, "Driver is not initialized."
         self.driver.get(self.url)
+
+        # ✅ wait for price element (or something guaranteed to exist)
+        try:
+            WebDriverWait(self.driver, 15).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, self.selectors["basic"]["price"]))
+            )
+        except Exception:
+            print(f"Timeout waiting for {self.url}")
+
         html = self.driver.page_source
         self.soup = BeautifulSoup(html, "html.parser")
 
