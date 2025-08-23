@@ -4,6 +4,9 @@ data/
 # Ignore house pages url log
 config/house_pages_scraped.txt
 
+# Ignore MLflow tracking folder
+mlruns/
+logs/mlruns/
 
 # Ignore Python junk
 __pycache__/
