@@ -1,6 +1,9 @@
 # Ignore all scraped data
 data/
 
+# Ignore house pages url log
+config/house_pages_scraped.txt
+
 
 # Ignore Python junk
 __pycache__/
