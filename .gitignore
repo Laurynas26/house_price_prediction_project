@@ -1,5 +1,7 @@
 # Ignore all scraped data
 data/
+# Ignore house pages log
+config/house_pages_scraped.txt
 
 
 # Ignore Python junk
