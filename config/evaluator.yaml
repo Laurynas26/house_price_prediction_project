@@ -1,0 +1,13 @@
+evaluator:
+  default_fit_params:
+    xgb:
+      num_boost_round: 500
+      early_stopping_rounds: 50
+      verbose_eval: false
+    rf:
+      n_estimators: 200
+      max_depth: 10
+      random_state: 42
+    linear:
+      fit_intercept: true
+      normalize: false
