@@ -1,43 +1,66 @@
-import mlflow
-import mlflow.sklearn
 import numpy as np
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+import xgboost as xgb
 
-def evaluate_model(
-    model, X_train, y_train, X_test, y_test, metrics=None, fit_params=None
-):
-    """
-    Fit model, predict, and return evaluation metrics.
-    """
-    if fit_params is None:
-        fit_params = {}
-    model.fit(X_train, y_train, **fit_params)
 
-    y_train_pred = model.predict(X_train)
-    y_test_pred = model.predict(X_test)
-
-    results = {}
-    if metrics is None:
-        metrics = {
+class ModelEvaluator:
+    def __init__(self, metrics=None, default_fit_params=None):
+        self.metrics = metrics or {
             "rmse": lambda y, y_pred: np.sqrt(mean_squared_error(y, y_pred)),
-            "mea": lambda y, y_pred: mean_absolute_error(y, y_pred),
+            "mae": lambda y, y_pred: mean_absolute_error(y, y_pred),
             "r2": r2_score,
         }
+        self.default_fit_params = default_fit_params or {}
+        self.results = {}
 
-    for name, func in metrics.items():
-        results[f"train_{name}"] = func(y_train, y_train_pred)
-        results[f"test_{name}"] = func(y_test, y_test_pred)
+    def evaluate(
+        self,
+        model,
+        X_train,
+        y_train,
+        X_test,
+        y_test,
+        fit_params=None,
+        use_xgb_train=False,
+        model_name=None,
+    ):
+        model_name = model_name or "model_run"
+        self.results = {}
+        model_defaults = self.default_fit_params.get(model_name, {})
+        params = {**model_defaults, **(fit_params or {})}
 
-    return model, results
+        X_val = params.pop("X_val", None)
+        y_val = params.pop("y_val", None)
 
+        if use_xgb_train:
+            dtrain = xgb.DMatrix(X_train, label=y_train)
+            if X_val is not None and y_val is not None:
+                dval = xgb.DMatrix(X_val, label=y_val)
+                evals = params.pop("evals", [(dval, "validation")])
+            else:
+                dval = xgb.DMatrix(X_test, label=y_test)
+                evals = params.pop("evals", [(dval, "eval")])
 
-def log_to_mlflow(model, model_name, results):
-    """
-    Log model and metrics to MLflow.
-    """
-    with mlflow.start_run(run_name=model_name):
-        mlflow.sklearn.log_model(model, f"{model_name}_model")
-        mlflow.log_metrics(results)
-        if hasattr(model, "get_params"):
-            mlflow.log_params(model.get_params())
-        print(f"{model_name} -> {results}")
+            trained_model = xgb.train(
+                model,
+                dtrain,
+                num_boost_round=params.pop("num_boost_round", 500),
+                evals=evals,
+                early_stopping_rounds=params.pop("early_stopping_rounds", 50),
+                verbose_eval=params.pop("verbose_eval", False),
+            )
+
+            y_train_pred = trained_model.predict(dtrain)
+            y_test_pred = trained_model.predict(xgb.DMatrix(X_test))
+
+        else:
+            trained_model = model
+            trained_model.fit(X_train, y_train, **params)
+            y_train_pred = trained_model.predict(X_train)
+            y_test_pred = trained_model.predict(X_test)
+
+        for name, func in self.metrics.items():
+            self.results[f"train_{name}"] = func(y_train, y_train_pred)
+            self.results[f"test_{name}"] = func(y_test, y_test_pred)
+
+        return trained_model, self.results
