@@ -1,0 +1,11 @@
+preprocessing:
+  drop_raw: false 
+  numeric_cols:
+    - bedrooms
+    - nr_rooms
+    - bathrooms
+    - toilets
+  imputation:
+    year_of_construction: median
+    size_num: mean
+    external_storage_num: constant:0
