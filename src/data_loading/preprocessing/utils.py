@@ -26,7 +26,7 @@ def to_float_pct(s):
         return float(s) / 100
     s = str(s).strip()
     digits = re.sub(r"[^\d]", "", s)
-    return float(digits)/100 if digits else np.nan
+    return float(digits) / 100 if digits else np.nan
 
 
 def safe_to_float_currency(s):
@@ -44,9 +44,9 @@ def safe_to_float_currency(s):
     s = re.sub(r"[^\d.]", "", s)
 
     # Keep only the first dot (merge the rest)
-    if s.count('.') > 1:
-        parts = s.split('.')
-        s = parts[0] + '.' + ''.join(parts[1:])
+    if s.count(".") > 1:
+        parts = s.split(".")
+        s = parts[0] + "." + "".join(parts[1:])
 
     try:
         return float(s)
@@ -62,7 +62,7 @@ def parse_price(s):
     if s is None or pd.isna(s):
         return np.nan
     s = str(s).strip()
-    digits = re.sub(r"[^\d]", "", s) 
+    digits = re.sub(r"[^\d]", "", s)
     return int(digits) if digits else np.nan
 
 
@@ -87,3 +87,26 @@ def split_postal_city(s):
     if len(parts) == 2:
         return parts[0], parts[1]
     return s, pd.NA
+
+
+def parse_year(year):
+    """
+    Convert year string to int, allowing non-digit characters.
+    """
+    if isinstance(year, str):
+        if year.startswith("Voor"):  # e.g., "Voor 1906"
+            return int(year.split()[-1]) - 1  # use 1905
+        elif year.startswith("Na"):  # e.g., "Na 2020"
+            return int(year.split()[-1]) + 1  # use 2021
+        elif year.isdigit():
+            return int(year)
+        else:
+            return None  # invalid string
+    elif isinstance(year, (int, float)):
+        return int(year)
+    else:
+        return None
+
+
+def coerce_numeric(df, cols):
+    return df[cols].apply(pd.to_numeric, errors="coerce")
