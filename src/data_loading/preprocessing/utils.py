@@ -110,3 +110,8 @@ def parse_year(year):
 
 def coerce_numeric(df, cols):
     return df[cols].apply(pd.to_numeric, errors="coerce")
+
+def apply_parsers(df, col_parser_map):
+    for col, parser in col_parser_map.items():
+        df[col + "_num"] = df[col].apply(parser)
+    return df
