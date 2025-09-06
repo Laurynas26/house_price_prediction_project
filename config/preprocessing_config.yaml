@@ -5,7 +5,9 @@ preprocessing:
     - nr_rooms
     - bathrooms
     - toilets
+    - year_of_construction
   imputation:
-    year_of_construction: median
-    size_num: mean
+    size_num: median
     external_storage_num: constant:0
+    year_of_construction: median
+    contribution_vve_num: constant:0

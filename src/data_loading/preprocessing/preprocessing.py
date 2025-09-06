@@ -19,11 +19,16 @@ from .utils import (
 
 
 def preprocess_df(df, drop_raw=False, numeric_cols=None):
+    df = df.rename(
+        columns={
+            "contribution": "contribution_vve",
+        }
+    )
     df = apply_parsers(
         df,
         {
             "price": parse_price,
-            "contribution": parse_price,
+            "contribution_vve": parse_price,
             "size": parse_size,
             "external_storage": parse_size,
             "year_of_construction": parse_year,
@@ -31,7 +36,7 @@ def preprocess_df(df, drop_raw=False, numeric_cols=None):
     )
 
     if numeric_cols:
-        df[numeric_cols] = df[numeric_cols].apply(coerce_numeric)
+        df[numeric_cols] = coerce_numeric(df, numeric_cols)
 
     preprocessing_steps = [
         preprocess_outdoor_features_column,
@@ -48,7 +53,7 @@ def preprocess_df(df, drop_raw=False, numeric_cols=None):
     if drop_raw:
         columns_to_drop = [
             "price",
-            "contribution",
+            "contribution_vve",
             "size",
             "external_storage",
         ]
