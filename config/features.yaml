@@ -1,0 +1,21 @@
+linear_regression:
+  features:
+    - size_num
+    - bedrooms
+    - year_of_construction
+    - nr_rooms
+    - bathrooms
+    - toilets
+    - contribution_vve_num
+    - external_storage_num
+    - inhabitants_in_neighborhood
+    - families_with_children_pct
+    - price_per_m2_neighborhood
+  target: price_num
+
+train_test_split:
+  test_size: 0.2
+  random_state: 42
+scaling:
+  method: "StandardScaler"
+  scale: true
