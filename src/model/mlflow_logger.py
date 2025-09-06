@@ -2,7 +2,7 @@ import mlflow
 import mlflow.sklearn
 import mlflow.xgboost
 
-class MLflowLogger:
+class MLFlowLogger:
     def __init__(self):
         pass
 
