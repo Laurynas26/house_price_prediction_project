@@ -13,9 +13,99 @@ linear_regression:
     - price_per_m2_neighborhood
   target: price_num
 
-train_test_split:
-  test_size: 0.2
-  random_state: 42
-scaling:
-  method: "StandardScaler"
-  scale: true
+  train_test_split:
+    test_size: 0.2
+    random_state: 42
+  scaling:
+    method: "StandardScaler"
+    scale: true
+
+random_forest:
+  features:
+    - size_num
+    - bedrooms
+    - energy_label
+    - year_of_construction
+    - nr_rooms
+    - bathrooms
+    - toilets
+    - contribution_vve_num
+    - external_storage_num
+    - has_mechanische_ventilatie
+    - has_tv_kabel
+    - has_lift
+    - has_natuurlijke_ventilatie
+    - has_n/a
+    - has_schuifpui
+    - has_glasvezelkabel
+    - has_frans_balkon
+    - has_buitenzonwering
+    - has_zonnepanelen
+    - has_airconditioning
+    - has_balansventilatie
+    - has_dakraam
+    - has_alarminstallatie
+    - has_domotica
+    - has_rookkanaal
+    - has_elektra
+    - has_sauna
+    - has_zonnecollectoren
+    - has_cctv
+    - has_rolluiken
+    - has_stromend_water
+    - has_satellietschotel
+    - num_facilities
+    - inhabitants_in_neighborhood
+    - families_with_children_pct
+    - price_per_m2_neighborhood
+  target: price_num
+  train_test_split:
+    test_size: 0.2
+    random_state: 42
+  scaling:
+    scale: false
+
+XGBoost:
+  features:
+    - size_num
+    - bedrooms
+    - energy_label
+    - year_of_construction
+    - nr_rooms
+    - bathrooms
+    - toilets
+    - contribution_vve_num
+    - external_storage_num
+    - has_mechanische_ventilatie
+    - has_tv_kabel
+    - has_lift
+    - has_natuurlijke_ventilatie
+    - has_n/a
+    - has_schuifpui
+    - has_glasvezelkabel
+    - has_frans_balkon
+    - has_buitenzonwering
+    - has_zonnepanelen
+    - has_airconditioning
+    - has_balansventilatie
+    - has_dakraam
+    - has_alarminstallatie
+    - has_domotica
+    - has_rookkanaal
+    - has_elektra
+    - has_sauna
+    - has_zonnecollectoren
+    - has_cctv
+    - has_rolluiken
+    - has_stromend_water
+    - has_satellietschotel
+    - num_facilities
+    - inhabitants_in_neighborhood
+    - families_with_children_pct
+    - price_per_m2_neighborhood
+  target: price_num
+  train_test_split:
+    test_size: 0.2
+    random_state: 42
+  scaling:
+    scale: false

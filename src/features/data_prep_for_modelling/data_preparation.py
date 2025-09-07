@@ -11,15 +11,17 @@ SCALERS = {
 
 
 def load_features_config(config_path, model_name):
-    """Load features and target from YAML."""
+    """Load features, target, split, and scaling config for a
+    specific model from YAML."""
     with open(config_path) as f:
         cfg = yaml.safe_load(f)
-    features = cfg[model_name]["features"]
-    target = cfg[model_name]["target"]
-    split_cfg = cfg.get(
+    model_cfg = cfg[model_name]
+    features = model_cfg["features"]
+    target = model_cfg["target"]
+    split_cfg = model_cfg.get(
         "train_test_split", {"test_size": 0.2, "random_state": 42}
     )
-    scaling_cfg = cfg.get(
+    scaling_cfg = model_cfg.get(
         "scaling", {"method": "StandardScaler", "scale": True}
     )
     return features, target, split_cfg, scaling_cfg
@@ -47,15 +49,15 @@ def scale_data(X_train, X_test, scaler_cls=StandardScaler):
     return X_train_scaled, X_test_scaled, scaler
 
 
-def prepare_data(df, config_path, model_name, scale=True):
+def prepare_data(df, config_path, model_name):
     """
-    Wrapper function: select features, split, and optionally scale data according to YAML config.
+    Wrapper function: select features, split, and optionally scale data
+    according to YAML config.
 
     Args:
         df: DataFrame
         config_path: path to YAML config
         model_name: name of the model section in YAML
-        scale: whether to scale features
 
     Returns:
         X_train, X_test, y_train, y_test, scaler (None if scale=False)
@@ -73,7 +75,7 @@ def prepare_data(df, config_path, model_name, scale=True):
         random_state=split_cfg.get("random_state", 42),
     )
 
-    if scale and scaling_cfg.get("scale", True):
+    if scaling_cfg.get("scale", True):
         scaler_cls = SCALERS.get(
             scaling_cfg.get("method", "StandardScaler"), StandardScaler
         )
