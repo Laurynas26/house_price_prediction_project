@@ -33,6 +33,7 @@ def test_preprocess_df_basic():
             "size": "100 m²",
             "contribution": "€ 200",
             "external_storage": "10 m²",
+            "year_of_construction": "2000",
             "outdoor_features": {
                 "Ligging": "In woonwijk",
                 "Tuin": None,
