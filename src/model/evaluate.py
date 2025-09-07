@@ -20,26 +20,31 @@ class ModelEvaluator:
         y_train,
         X_test,
         y_test,
+        X_val=None,
+        y_val=None,
         fit_params=None,
         use_xgb_train=False,
         model_name=None,
     ):
+        """
+        Evaluate a model (scikit-learn or XGBoost).
+        For XGBoost, supports early stopping 
+        with optional validation set.
+        """
         model_name = model_name or "model_run"
         self.results = {}
         model_defaults = self.default_fit_params.get(model_name, {})
         params = {**model_defaults, **(fit_params or {})}
 
-        X_val = params.pop("X_val", None)
-        y_val = params.pop("y_val", None)
-
         if use_xgb_train:
             dtrain = xgb.DMatrix(X_train, label=y_train)
+
             if X_val is not None and y_val is not None:
                 dval = xgb.DMatrix(X_val, label=y_val)
-                evals = params.pop("evals", [(dval, "validation")])
+                evals = [(dval, "validation")]
             else:
                 dval = xgb.DMatrix(X_test, label=y_test)
-                evals = params.pop("evals", [(dval, "eval")])
+                evals = [(dval, "eval")]
 
             trained_model = xgb.train(
                 model,

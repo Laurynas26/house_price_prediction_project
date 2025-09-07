@@ -62,6 +62,7 @@ random_forest:
   train_test_split:
     test_size: 0.2
     random_state: 42
+    val_required: false
   scaling:
     scale: false
 
@@ -107,5 +108,74 @@ XGBoost:
   train_test_split:
     test_size: 0.2
     random_state: 42
+    val_required: false
   scaling:
     scale: false
+
+  fit_params:
+    num_boost_round: 500
+    early_stopping_rounds: 50
+    verbose_eval: false
+  model_params:
+    objective: reg:squarederror
+    max_depth: 6
+    eta: 0.05
+    seed: 42
+
+
+XGBoostEarlyStopping:
+  features:
+    - size_num
+    - bedrooms
+    - energy_label
+    - year_of_construction
+    - nr_rooms
+    - bathrooms
+    - toilets
+    - contribution_vve_num
+    - external_storage_num
+    - has_mechanische_ventilatie
+    - has_tv_kabel
+    - has_lift
+    - has_natuurlijke_ventilatie
+    - has_n/a
+    - has_schuifpui
+    - has_glasvezelkabel
+    - has_frans_balkon
+    - has_buitenzonwering
+    - has_zonnepanelen
+    - has_airconditioning
+    - has_balansventilatie
+    - has_dakraam
+    - has_alarminstallatie
+    - has_domotica
+    - has_rookkanaal
+    - has_elektra
+    - has_sauna
+    - has_zonnecollectoren
+    - has_cctv
+    - has_rolluiken
+    - has_stromend_water
+    - has_satellietschotel
+    - num_facilities
+    - inhabitants_in_neighborhood
+    - families_with_children_pct
+    - price_per_m2_neighborhood
+  target: price_num
+  train_test_split:
+    test_size: 0.2
+    random_state: 42
+    val_required: true
+    val_size: 0.1
+  scaling:
+    scale: false
+
+  fit_params:
+    num_boost_round: 500
+    early_stopping_rounds: 50
+    verbose_eval: false
+  model_params:
+    objective: reg:squarederror
+    max_depth: 6
+    eta: 0.05
+    seed: 42

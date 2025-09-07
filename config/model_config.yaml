@@ -1,0 +1,33 @@
+xgb:
+  model_params:
+    n_estimators: 500
+    max_depth: 6
+    learning_rate: 0.05
+    random_state: 42
+  fit_params: {}
+
+xgb_with_early_stopping:
+  model_params:
+    objective: reg:squarederror
+    max_depth: 6
+    eta: 0.05
+    seed: 42
+
+  fit_params:
+    num_boost_round: 500
+    early_stopping_rounds: 50
+    verbose_eval: false
+
+rf:
+  model_params:
+    n_estimators: 200
+    max_depth: 10
+    random_state: 42
+
+  fit_params: {}
+
+linear:
+  model_params:
+    fit_intercept: true
+
+  fit_params: {}
