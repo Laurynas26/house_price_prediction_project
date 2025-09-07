@@ -63,7 +63,8 @@ def scale_data(X_train, X_test, scaler_cls=StandardScaler):
 
 def prepare_data(df, config_path, model_name):
     """
-    Wrapper function: select features, split (train/test and optionally validation),
+    Wrapper function: select features, split
+    (train/test and optionally validation),
     and optionally scale data according to YAML config.
 
     Returns:
