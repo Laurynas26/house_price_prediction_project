@@ -34,11 +34,23 @@ def select_and_clean(df, features, target):
     return X, y
 
 
-def split_data(X, y, test_size=0.2, random_state=42):
-    """Split features and target into train/test sets."""
-    return train_test_split(
+def split_train_val_test_data(
+    X, y, test_size=0.2, val_size=0.1, random_state=42, val_required=False
+):
+    """Split features and target into train/val/test sets."""
+    X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=test_size, random_state=random_state
     )
+    if val_required:
+        val_relative_size = val_size / (1 - test_size)
+        X_train, X_val, y_train, y_val = train_test_split(
+            X_train,
+            y_train,
+            test_size=val_relative_size,
+            random_state=random_state,
+        )
+        return X_train, X_val, X_test, y_train, y_val, y_test
+    return X_train, X_test, y_train, y_test
 
 
 def scale_data(X_train, X_test, scaler_cls=StandardScaler):
@@ -51,16 +63,12 @@ def scale_data(X_train, X_test, scaler_cls=StandardScaler):
 
 def prepare_data(df, config_path, model_name):
     """
-    Wrapper function: select features, split, and optionally scale data
-    according to YAML config.
-
-    Args:
-        df: DataFrame
-        config_path: path to YAML config
-        model_name: name of the model section in YAML
+    Wrapper function: select features, split
+    (train/test and optionally validation),
+    and optionally scale data according to YAML config.
 
     Returns:
-        X_train, X_test, y_train, y_test, scaler (None if scale=False)
+        X_train, X_test, y_train, y_test, scaler, X_val=None, y_val=None
     """
     features, target, split_cfg, scaling_cfg = load_features_config(
         config_path, model_name
@@ -68,19 +76,34 @@ def prepare_data(df, config_path, model_name):
 
     X, y = select_and_clean(df, features, target)
 
-    X_train, X_test, y_train, y_test = split_data(
+    # Determine if validation set is required
+    val_required = split_cfg.get("val_required", False)
+    val_size = split_cfg.get("val_size", 0.1)
+
+    split_result = split_train_val_test_data(
         X,
         y,
         test_size=split_cfg.get("test_size", 0.2),
         random_state=split_cfg.get("random_state", 42),
+        val_required=val_required,
+        val_size=val_size,
     )
+
+    # Unpack according to number of returned values
+    if val_required:
+        X_train, X_val, X_test, y_train, y_val, y_test = split_result
+    else:
+        X_train, X_test, y_train, y_test = split_result
+        X_val, y_val = None, None
 
     if scaling_cfg.get("scale", True):
         scaler_cls = SCALERS.get(
             scaling_cfg.get("method", "StandardScaler"), StandardScaler
         )
         X_train, X_test, scaler = scale_data(X_train, X_test, scaler_cls)
+        if X_val is not None:
+            X_val = scaler.transform(X_val)
     else:
         scaler = None
 
-    return X_train, X_test, y_train, y_test, scaler
+    return X_train, X_test, y_train, y_test, scaler, X_val, y_val
