@@ -27,7 +27,9 @@ class ModelEvaluator:
         model_name=None,
     ):
         """
-        Evaluate a model (scikit-learn or XGBoost). For XGBoost, supports early stopping with optional validation set.
+        Evaluate a model (scikit-learn or XGBoost).
+        For XGBoost, supports early stopping 
+        with optional validation set.
         """
         model_name = model_name or "model_run"
         self.results = {}
