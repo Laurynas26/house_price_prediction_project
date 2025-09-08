@@ -44,3 +44,22 @@ def encode_energy_label(X, column="energy_label", encoder=None, fit=True):
     X = X.drop(columns=[column])
 
     return X, encoder
+
+
+def encode_energy_labels_train_test_val(X_train, X_test, X_val=None):
+    """
+    Encode energy_label feature for train, test, and optional validation sets.
+
+    Returns:
+        X_train_encoded, X_test_encoded, X_val_encoded (or None if no val),
+        encoder
+    """
+    X_train_encoded, encoder = encode_energy_label(X_train, fit=True)
+    X_test_encoded, _ = encode_energy_label(X_test, encoder=encoder, fit=False)
+    if X_val is not None:
+        X_val_encoded, _ = encode_energy_label(
+            X_val, encoder=encoder, fit=False
+        )
+    else:
+        X_val_encoded = None
+    return X_train_encoded, X_test_encoded, X_val_encoded, encoder
