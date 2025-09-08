@@ -68,4 +68,4 @@ class ModelEvaluator:
             self.results[f"train_{name}"] = func(y_train, y_train_pred)
             self.results[f"test_{name}"] = func(y_test, y_test_pred)
 
-        return trained_model, self.results
+        return trained_model, y_train_pred, y_test_pred, self.results
