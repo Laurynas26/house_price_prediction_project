@@ -1,8 +1,7 @@
-from typing import Optional
 import pandas as pd
 import numpy as np
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.metrics import mean_squared_error
 
 from src.model.hyperparam_utils import (
     load_search_space,
@@ -11,7 +10,6 @@ from src.model.hyperparam_utils import (
 from src.model.evaluate import ModelEvaluator
 from src.features.data_prep_for_modelling.data_preparation import prepare_data
 from src.features.feature_engineering.encoding import (
-    encode_energy_label,
     encode_energy_labels_train_test_val,
 )
 
