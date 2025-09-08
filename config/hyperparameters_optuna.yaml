@@ -1,0 +1,46 @@
+xgboost:
+  objective: reg:squarederror
+  tree_method: hist
+  seed: 42
+  search_space:
+    max_depth:
+      type: int
+      low: 3
+      high: 12
+    eta:
+      type: float
+      low: 0.01
+      high: 0.3
+      log: true
+    subsample:
+      type: float
+      low: 0.6
+      high: 1.0
+    colsample_bytree:
+      type: float
+      low: 0.6
+      high: 1.0
+
+random_forest:
+  random_state: 42
+  n_jobs: -1
+  search_space:
+    n_estimators:
+      type: int
+      low: 200
+      high: 1000
+    max_depth:
+      type: int
+      low: 5
+      high: 30
+    min_samples_split:
+      type: int
+      low: 2
+      high: 10
+    min_samples_leaf:
+      type: int
+      low: 1
+      high: 4
+    max_features:
+      type: categorical
+      choices: ["sqrt", "log2", null]
