@@ -15,8 +15,10 @@ class ModelEvaluator:
         Args:
             metrics: dict of metric_name -> function(y_true, y_pred)
             default_fit_params: dict of model_name -> default fit params
-            target_transform: function to apply to y before fitting (e.g., np.log1p)
-            inverse_transform: function to inverse-transform predictions (e.g., np.expm1)
+            target_transform: function to apply to y before fitting
+            (e.g., np.log1p)
+            inverse_transform: function to inverse-transform predictions
+            (e.g., np.expm1)
         """
         self.metrics = metrics or {
             "rmse": lambda y, y_pred: np.sqrt(mean_squared_error(y, y_pred)),
