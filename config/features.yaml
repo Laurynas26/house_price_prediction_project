@@ -11,8 +11,8 @@ linear_regression:
     - inhabitants_in_neighborhood
     - families_with_children_pct
     - price_per_m2_neighborhood
+  extended_features: [] # empty because linear regression uses only core features
   target: price_num
-
   train_test_split:
     test_size: 0.2
     random_state: 42
@@ -58,6 +58,11 @@ random_forest:
     - inhabitants_in_neighborhood
     - families_with_children_pct
     - price_per_m2_neighborhood
+  extended_features:
+    - floor_level
+    - lease_years_remaining
+    - balcony_flag
+    - backyard_num
   target: price_num
   train_test_split:
     test_size: 0.2
@@ -104,6 +109,11 @@ random_forest_optuna:
     - inhabitants_in_neighborhood
     - families_with_children_pct
     - price_per_m2_neighborhood
+  extended_features:
+    - floor_level
+    - lease_years_remaining
+    - balcony_flag
+    - backyard_num
   target: price_num
   train_test_split:
     test_size: 0.2
@@ -150,6 +160,11 @@ XGBoost:
     - inhabitants_in_neighborhood
     - families_with_children_pct
     - price_per_m2_neighborhood
+  extended_features:
+    - floor_level
+    - lease_years_remaining
+    - balcony_flag
+    - backyard_num
   target: price_num
   train_test_split:
     test_size: 0.2
@@ -167,7 +182,6 @@ XGBoost:
     max_depth: 6
     eta: 0.05
     seed: 42
-
 
 XGBoostEarlyStopping:
   features:
@@ -207,6 +221,11 @@ XGBoostEarlyStopping:
     - inhabitants_in_neighborhood
     - families_with_children_pct
     - price_per_m2_neighborhood
+  extended_features:
+    - floor_level
+    - lease_years_remaining
+    - balcony_flag
+    - backyard_num
   target: price_num
   train_test_split:
     test_size: 0.2
