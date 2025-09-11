@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import mean_squared_error
 
 from src.model.hyperparam_utils import (
     load_search_space,
@@ -80,12 +79,12 @@ def objective_rf(
     features_config: str,
     hyperparam_config: str,
     model_name: str,
-    use_log: bool = False
+    use_log: bool = False,
 ) -> float:
     """
     Optuna objective function for Random Forest regression.
 
-    This function prepares the data, applies optional log transformation 
+    This function prepares the data, applies optional log transformation
     to the target, samples hyperparameters from the search space, fits
     a Random Forest model, and returns the test RMSE.
 
@@ -95,14 +94,17 @@ def objective_rf(
         features_config: Path to YAML with feature configuration.
         hyperparam_config: Path to YAML with hyperparameter search space.
         model_name: Name of the model (used for data prep and logging).
-        use_log: If True, applies log1p transform to the target and 
+        use_log: If True, applies log1p transform to the target and
                  expm1 to predictions.
 
     Returns:
-        float: Test RMSE on the target (after inverse transform if log applied).
+        float: Test RMSE on the target
+        (after inverse transform if log applied).
     """
     # Load search space
-    base_params, search_space = load_search_space(hyperparam_config, "random_forest")
+    base_params, search_space = load_search_space(
+        hyperparam_config, "random_forest"
+    )
     params = suggest_params_from_space(trial, base_params, search_space)
 
     # Prepare data
@@ -119,8 +121,7 @@ def objective_rf(
 
     # Use evaluator to fit and evaluate
     evaluator = ModelEvaluator(
-        target_transform=target_transform,
-        inverse_transform=inverse_transform
+        target_transform=target_transform, inverse_transform=inverse_transform
     )
 
     model = RandomForestRegressor(**params)
@@ -132,7 +133,7 @@ def objective_rf(
         y_test,
         X_val=X_val,
         y_val=y_val,
-        model_name="rf_optuna_log" if use_log else "rf_optuna"
+        model_name="rf_optuna_log" if use_log else "rf_optuna",
     )
 
     return results["test_rmse"]
