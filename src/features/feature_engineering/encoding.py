@@ -17,7 +17,7 @@ def encode_energy_label(X, column="energy_label", encoder=None, fit=True):
     """
     X = X.copy()
 
-    X[column] = X[column].replace({0: "G"})
+    X[column] = X[column].replace({0: "G"}).replace("N/A", "G")
 
     energy_order = [
         "G",
