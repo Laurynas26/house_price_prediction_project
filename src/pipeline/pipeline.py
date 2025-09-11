@@ -1,6 +1,8 @@
-
-from src.features.feature_engineering.feature_engineering import prepare_features
+from src.features.feature_engineering.feature_engineering import (
+    prepare_features,
+)
 from src.features.data_prep_for_modelling.data_preparation import prepare_data
+
 
 def prepare_full_data(df, config_path, model_name):
     """
@@ -8,14 +10,15 @@ def prepare_full_data(df, config_path, model_name):
     1. Select features & split according to YAML.
     2. Fit feature engineering on train set.
     3. Apply same transformations to test/validation sets.
-    
+
     Args:
         df: Raw dataframe.
         config_path: Path to YAML defining features, target, splits, scaling.
         model_name: Name of model/config in YAML.
-    
+
     Returns:
-        X_train_fe, X_test_fe, y_train_fe, y_test_fe, scaler, X_val_fe, y_val_fe, log_cols, fe_encoders
+        X_train_fe, X_test_fe, y_train_fe, y_test_fe, scaler,
+        X_val_fe, y_val_fe, log_cols, fe_encoders
     """
     # ------------------------
     # Step 1: Split & scale raw features using YAML
@@ -44,4 +47,14 @@ def prepare_full_data(df, config_path, model_name):
     else:
         X_val_fe, y_val_fe = None, None
 
-    return X_train_fe, X_test_fe, y_train_fe, y_test_fe, scaler, X_val_fe, y_val_fe, log_cols, fe_encoders
+    return (
+        X_train_fe,
+        X_test_fe,
+        y_train_fe,
+        y_test_fe,
+        scaler,
+        X_val_fe,
+        y_val_fe,
+        log_cols,
+        fe_encoders,
+    )
