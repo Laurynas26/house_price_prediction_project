@@ -10,14 +10,19 @@ SCALERS = {
 }
 
 
-def load_features_config(config_path, model_name):
-    """Load features, target, split, and scaling config for a
-    specific model from YAML."""
+def load_features_config(config_path, model_name, use_extended_features=False):
+    """Load features, target, split, and scaling config for a specific model from YAML."""
     with open(config_path) as f:
         cfg = yaml.safe_load(f)
     model_cfg = cfg[model_name]
-    features = model_cfg["features"]
+    features = model_cfg.get("features", [])
     target = model_cfg["target"]
+
+    # Include extended features if flag is True
+    if use_extended_features:
+        extended = model_cfg.get("extended_features", [])
+        features = features + extended
+
     split_cfg = model_cfg.get(
         "train_test_split", {"test_size": 0.2, "random_state": 42}
     )
@@ -61,7 +66,7 @@ def scale_data(X_train, X_test, scaler_cls=StandardScaler):
     return X_train_scaled, X_test_scaled, scaler
 
 
-def prepare_data(df, config_path, model_name):
+def prepare_data(df, config_path, model_name, use_extended_features=False):
     """
     Wrapper function: select features, split
     (train/test and optionally validation),
@@ -71,7 +76,7 @@ def prepare_data(df, config_path, model_name):
         X_train, X_test, y_train, y_test, scaler, X_val=None, y_val=None
     """
     features, target, split_cfg, scaling_cfg = load_features_config(
-        config_path, model_name
+        config_path, model_name, use_extended_features=use_extended_features
     )
 
     X, y = select_and_clean(df, features, target)
