@@ -236,7 +236,7 @@ XGBoostEarlyStopping:
     scale: false
 
   fit_params:
-    num_boost_round: 500
+    num_boost_round: 1000
     early_stopping_rounds: 50
     verbose_eval: false
   model_params:
