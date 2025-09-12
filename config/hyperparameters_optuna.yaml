@@ -20,6 +20,18 @@ xgboost:
       type: float
       low: 0.6
       high: 1.0
+    gamma:
+      type: float
+      low: 0
+      high: 5   # min_split_loss, regularizes splits
+    lambda:
+      type: float
+      low: 0
+      high: 10  # L2 regularization
+    alpha:
+      type: float
+      low: 0
+      high: 5   # L1 regularization
 
 random_forest:
   random_state: 42
@@ -36,11 +48,11 @@ random_forest:
     min_samples_split:
       type: int
       low: 2
-      high: 10
+      high: 20
     min_samples_leaf:
       type: int
-      low: 1
-      high: 4
+      low: 2
+      high: 8
     max_features:
       type: categorical
       choices: ["sqrt", "log2", null]
