@@ -5,18 +5,13 @@ import xgboost as xgb
 
 class ModelEvaluator:
     def __init__(
-        self,
-        metrics=None,
-        default_fit_params=None,
-        target_transform=None,
-        inverse_transform=None,
+        self, metrics=None, target_transform=None, inverse_transform=None
     ):
         """
         Evaluate models with optional target transformation and early stopping.
 
         Args:
             metrics: dict of metric_name -> function(y_true, y_pred)
-            default_fit_params: dict of model_name -> default fit parameters
             target_transform: function applied to y before fitting (e.g., np.log1p)
             inverse_transform: function applied to predictions to revert transform (e.g., np.expm1)
         """
@@ -26,7 +21,6 @@ class ModelEvaluator:
             "r2": r2_score,
             "mape": lambda y, y_pred: np.mean(np.abs((y - y_pred) / y)) * 100,
         }
-        self.default_fit_params = default_fit_params or {}
         self.target_transform = target_transform
         self.inverse_transform = inverse_transform
         self.results = {}
@@ -47,28 +41,25 @@ class ModelEvaluator:
         y_test,
         X_val=None,
         y_val=None,
+        model_params=None,
         fit_params=None,
         use_xgb_train=False,
-        model_name=None,
     ):
         """
         Evaluate a model with training and validation sets.
 
         Args:
-            model: sklearn model or XGBoost params dict
+            model: sklearn model instance or XGBoost Booster
             X_train, y_train: training data
             X_val, y_val: validation data (required for XGBoost early stopping)
             X_test, y_test: test data (metrics only)
-            fit_params: additional fit parameters
+            model_params: fixed model parameters from YAML
+            fit_params: fit parameters from YAML (or overrides)
             use_xgb_train: if True, use xgboost.train with early stopping
-            model_name: optional string for default fit parameters
         """
-        model_name = model_name or "model_run"
         self.results = {}
-        model_defaults = self.default_fit_params.get(model_name, {})
-        params = {**model_defaults, **(fit_params or {})}
 
-        # Transform targets
+        # Apply target transformation
         y_train_trans = self._apply_transform(y_train)
         y_val_trans = (
             self._apply_transform(y_val) if y_val is not None else None
@@ -78,7 +69,7 @@ class ModelEvaluator:
         if use_xgb_train:
             if X_val is None or y_val is None:
                 raise ValueError(
-                    "Validation set must be provided for XGBoost to avoid leakage."
+                    "Validation set must be provided for XGBoost early stopping."
                 )
 
             dtrain = xgb.DMatrix(X_train, label=y_train_trans)
@@ -86,12 +77,14 @@ class ModelEvaluator:
             evals = [(dval, "validation")]
 
             trained_model = xgb.train(
-                params,
-                dtrain,
-                num_boost_round=params.pop("num_boost_round", 500),
+                params=model_params or {},
+                dtrain=dtrain,
+                num_boost_round=(fit_params or {}).get("num_boost_round", 500),
                 evals=evals,
-                early_stopping_rounds=params.pop("early_stopping_rounds", 50),
-                verbose_eval=params.pop("verbose_eval", False),
+                early_stopping_rounds=(fit_params or {}).get(
+                    "early_stopping_rounds", 50
+                ),
+                verbose_eval=(fit_params or {}).get("verbose_eval", False),
             )
 
             y_train_pred = trained_model.predict(dtrain)
@@ -101,7 +94,12 @@ class ModelEvaluator:
         else:
             # Standard sklearn model
             trained_model = model
-            trained_model.fit(X_train, y_train_trans, **params)
+            combined_fit_params = {
+                **(model_params or {}),
+                **(fit_params or {}),
+            }
+            trained_model.fit(X_train, y_train_trans, **combined_fit_params)
+
             y_train_pred = trained_model.predict(X_train)
             y_val_pred = (
                 trained_model.predict(X_val) if X_val is not None else None
