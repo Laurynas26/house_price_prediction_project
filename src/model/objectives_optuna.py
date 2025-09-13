@@ -29,7 +29,8 @@ def unified_objective(
 ) -> float:
     """
     Unified Optuna objective for any model defined in YAML.
-    Supports XGBoost, Random Forest, Linear Regression, with optional log-transform.
+    Supports XGBoost, Random Forest, Linear Regression,
+    with optional log-transform.
 
     Returns:
         float: Validation RMSE (inverse-transformed if log applied)
@@ -78,7 +79,7 @@ def unified_objective(
             use_xgb_train=True,
         )
 
-    elif "rf" in model_name.lower():
+    elif "rf" in model_name.lower() or "random_forest" in model_name.lower():
         model = RandomForestRegressor(**model_params)
         _, _, _, _, results = evaluator.evaluate(
             model=model,

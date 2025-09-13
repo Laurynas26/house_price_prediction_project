@@ -10,17 +10,27 @@ class MLFlowLogger:
         MLflow logger for sklearn and XGBoost models.
 
         Args:
-            log_transformed_metrics: If True, logs metrics with "_trans" suffix.
+            log_transformed_metrics: If True, logs metrics
+            with "_trans" suffix.
         """
         self.log_transformed_metrics = log_transformed_metrics
 
-    def log_model(self, model, model_name=None, results=None, use_xgb_train=False, params=None, folder_name="model"):
+    def log_model(
+        self,
+        model,
+        model_name=None,
+        results=None,
+        use_xgb_train=False,
+        params=None,
+        folder_name="model",
+    ):
         """
         Logs model, metrics, and parameters to MLflow.
 
         Args:
             model: Trained model object (sklearn or XGBoost)
-            model_name: Name of the run (optional, will add timestamp if None)
+            model_name: Name of the run (optional,
+            will add timestamp if None)
             results: dict of metrics
             use_xgb_train: True if model was trained via xgb.train
             params: dict of hyperparameters to log
@@ -29,7 +39,8 @@ class MLFlowLogger:
         results = results or {}
         model_name = model_name or f"model_run_{int(time.time())}"
 
-        # Filter metrics: log only train/val/test metrics; optionally include "_trans"
+        # Filter metrics: log only train/val/test metrics;
+        # optionally include "_trans"
         metrics_to_log = {}
         for k, v in results.items():
             if any(prefix in k for prefix in ["train_", "val_", "test_"]):
@@ -56,6 +67,8 @@ class MLFlowLogger:
                     mlflow.log_params(model.get_params())
 
             # Log metrics as artifact
-            mlflow.log_text(str(metrics_to_log), artifact_file=f"{folder_name}/metrics.txt")
+            mlflow.log_text(
+                str(metrics_to_log), artifact_file=f"{folder_name}/metrics.txt"
+            )
 
             print(f"{model_name} -> {metrics_to_log}")
