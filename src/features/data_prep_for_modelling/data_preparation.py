@@ -21,7 +21,7 @@ def load_features_config(config_path, model_name, use_extended_features=False):
     # Include extended features if flag is True
     if use_extended_features:
         extended = model_cfg.get("extended_features", [])
-        features = features + extended
+        features += extended
 
     split_cfg = model_cfg.get(
         "train_test_split", {"test_size": 0.2, "random_state": 42}
@@ -58,33 +58,39 @@ def split_train_val_test_data(
     return X_train, X_test, y_train, y_test
 
 
-def scale_data(X_train, X_test, scaler_cls=StandardScaler):
+def scale_data(X_train, X_test, X_val=None, scaler_cls=StandardScaler):
     """Scale numeric features using provided scaler class."""
     scaler = scaler_cls()
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled = scaler.transform(X_test)
-    return X_train_scaled, X_test_scaled, scaler
+    X_val_scaled = scaler.transform(X_val) if X_val is not None else None
+    return X_train_scaled, X_test_scaled, X_val_scaled, scaler
 
 
-def prepare_data(df, config_path, model_name, use_extended_features=False):
+def prepare_data(
+    df, config_path, model_name, use_extended_features=False
+):
     """
-    Wrapper function: select features, split
-    (train/test and optionally validation),
-    and optionally scale data according to YAML config.
-
-    Returns:
-        X_train, X_test, y_train, y_test, scaler, X_val=None, y_val=None
+    Wrapper function to prepare data for a given model:
+    - Select features
+    - Split into train/test and optional validation
+    - Scale numeric features if required
     """
+    # Load feature-related config
     features, target, split_cfg, scaling_cfg = load_features_config(
-        config_path, model_name, use_extended_features=use_extended_features
+        config_path,
+        model_name,
+        use_extended_features=use_extended_features,
     )
 
+    # Select columns and handle missing values
     X, y = select_and_clean(df, features, target)
 
-    # Determine if validation set is required
+    # Determine validation set
     val_required = split_cfg.get("val_required", False)
     val_size = split_cfg.get("val_size", 0.1)
 
+    # Split data
     split_result = split_train_val_test_data(
         X,
         y,
@@ -94,20 +100,20 @@ def prepare_data(df, config_path, model_name, use_extended_features=False):
         val_size=val_size,
     )
 
-    # Unpack according to number of returned values
     if val_required:
         X_train, X_val, X_test, y_train, y_val, y_test = split_result
     else:
         X_train, X_test, y_train, y_test = split_result
         X_val, y_val = None, None
 
+    # Scale features if required
     if scaling_cfg.get("scale", True):
         scaler_cls = SCALERS.get(
             scaling_cfg.get("method", "StandardScaler"), StandardScaler
         )
-        X_train, X_test, scaler = scale_data(X_train, X_test, scaler_cls)
-        if X_val is not None:
-            X_val = scaler.transform(X_val)
+        X_train, X_test, X_val, scaler = scale_data(
+            X_train, X_test, X_val, scaler_cls
+        )
     else:
         scaler = None
 
