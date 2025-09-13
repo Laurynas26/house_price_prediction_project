@@ -11,7 +11,8 @@ SCALERS = {
 
 
 def load_features_config(config_path, model_name, use_extended_features=False):
-    """Load features, target, split, and scaling config for a specific model from YAML."""
+    """Load features, target, split, and scaling config
+    for a specific model from YAML."""
     with open(config_path) as f:
         cfg = yaml.safe_load(f)
     model_cfg = cfg[model_name]
@@ -67,9 +68,7 @@ def scale_data(X_train, X_test, X_val=None, scaler_cls=StandardScaler):
     return X_train_scaled, X_test_scaled, X_val_scaled, scaler
 
 
-def prepare_data(
-    df, config_path, model_name, use_extended_features=False
-):
+def prepare_data(df, config_path, model_name, use_extended_features=False):
     """
     Wrapper function to prepare data for a given model:
     - Select features

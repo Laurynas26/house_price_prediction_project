@@ -1,8 +1,10 @@
 import yaml
 
+
 def load_model_config_and_search_space(config_path, model_name):
     """
-    Load model params, fit params, and optional Optuna search space from a unified YAML.
+    Load model params, fit params, and optional Optuna search space
+    from a unified YAML.
 
     Returns:
         model_params: dict of fixed model parameters
@@ -33,7 +35,9 @@ def suggest_params_from_space(trial, model_params, fit_params, search_space):
         if spec["type"] == "int":
             val = trial.suggest_int(name, spec["low"], spec["high"])
         elif spec["type"] == "float":
-            val = trial.suggest_float(name, spec["low"], spec["high"], log=spec.get("log", False))
+            val = trial.suggest_float(
+                name, spec["low"], spec["high"], log=spec.get("log", False)
+            )
         elif spec["type"] == "categorical":
             val = trial.suggest_categorical(name, spec["choices"])
         else:
