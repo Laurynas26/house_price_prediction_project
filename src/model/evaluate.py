@@ -12,8 +12,10 @@ class ModelEvaluator:
 
         Args:
             metrics: dict of metric_name -> function(y_true, y_pred)
-            target_transform: function applied to y before fitting (e.g., np.log1p)
-            inverse_transform: function applied to predictions to revert transform (e.g., np.expm1)
+            target_transform: function applied to y before fitting
+            (e.g., np.log1p)
+            inverse_transform: function applied to predictions
+            to revert transform (e.g., np.expm1)
         """
         self.metrics = metrics or {
             "rmse": lambda y, y_pred: np.sqrt(mean_squared_error(y, y_pred)),
@@ -69,7 +71,8 @@ class ModelEvaluator:
         if use_xgb_train:
             if X_val is None or y_val is None:
                 raise ValueError(
-                    "Validation set must be provided for XGBoost early stopping."
+                    "Validation set must be provided for XGBoost early"
+                    " stopping."
                 )
 
             dtrain = xgb.DMatrix(X_train, label=y_train_trans)
