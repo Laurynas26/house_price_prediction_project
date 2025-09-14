@@ -16,9 +16,9 @@ if __name__ == "__main__":
         urls = [line.strip() for line in f if line.strip()]
 
     # Only Amsterdam apartments first
-    amsterdam_urls = [url for url in urls if "/amsterdam/appartement" in url]
+    amsterdam_urls = [url for url in urls if "/koop/amsterdam/appartement" in url]
 
-    amsterdam_urls = amsterdam_urls[:1001]
+    amsterdam_urls = amsterdam_urls[:5651]
 
     for url in amsterdam_urls:
         if can_scrape(url):
