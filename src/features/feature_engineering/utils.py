@@ -35,6 +35,67 @@ def drop_low_variance_dummies(df, threshold=0.95):
     low_var_cols = [
         col
         for col in df.columns
-        if df[col].value_counts(normalize=True, dropna=False).iloc[0] >= threshold
+        if df[col].value_counts(normalize=True, dropna=False).iloc[0]
+        >= threshold
     ]
     return df.drop(columns=low_var_cols), low_var_cols
+
+
+def auto_log_transform_train(df_train, numeric_cols, threshold_skew=0.5):
+    """Compute which columns to log-transform on training fold and return fitted info."""
+    log_cols = []
+    for col in numeric_cols:
+        if (df_train[col] > 0).all():
+            skewness = df_train[col].skew()
+            if abs(skewness) > threshold_skew:
+                df_train[f"log_{col}"] = np.log1p(df_train[col])
+                log_cols.append(f"log_{col}")
+    return df_train, log_cols
+
+
+def apply_log_transform(df, log_cols):
+    """Apply log1p transform using training fold columns."""
+    for col in log_cols:
+        orig_col = col.replace("log_", "")
+        df[col] = np.log1p(df[orig_col])
+    return df
+
+
+def simplify_roof(roof):
+    if pd.isna(roof) or roof == "N/A":
+        return "Unknown"
+    if "Plat dak" in roof:
+        return "Flat"
+    if "Zadeldak" in roof:
+        return "Saddle"
+    if "Samengesteld dak" in roof:
+        return "Composite"
+    if "Mansarde" in roof:
+        return "Mansard"
+    return "Other"
+
+
+def simplify_ownership(x):
+    if pd.isna(x) or x.strip() == "":
+        return "Unknown"
+    if "Volle eigendom" in x:
+        return "Full"
+    if "Erfpacht" in x and "Gemeentelijk" in x:
+        return "Municipal"
+    if "Erfpacht" in x:
+        return "Leasehold"
+    return "Other"
+
+
+def simplify_location(x):
+    if pd.isna(x):
+        return "Unknown"
+    if "centrum" in x:
+        return "Central"
+    if "woonwijk" in x:
+        return "Residential"
+    if "vrij uitzicht" in x:
+        return "OpenView"
+    if "park" in x:
+        return "Park"
+    return "Other"
