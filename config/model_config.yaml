@@ -11,7 +11,7 @@ linear_regression:
     - inhabitants_in_neighborhood
     - families_with_children_pct
     - price_per_m2_neighborhood
-  extended_features: []
+    - energy_label
   target: price_num
   train_test_split:
     test_size: 0.2
@@ -62,11 +62,6 @@ random_forest:
     - inhabitants_in_neighborhood
     - families_with_children_pct
     - price_per_m2_neighborhood
-  extended_features:
-    - floor_level
-    - lease_years_remaining
-    - balcony_flag
-    - backyard_num
   target: price_num
   train_test_split:
     test_size: 0.2
@@ -138,11 +133,6 @@ random_forest_optuna:
     - inhabitants_in_neighborhood
     - families_with_children_pct
     - price_per_m2_neighborhood
-  extended_features:
-    - floor_level
-    - lease_years_remaining
-    - balcony_flag
-    - backyard_num
   target: price_num
   train_test_split:
     test_size: 0.2
@@ -214,11 +204,6 @@ xgboost:
     - inhabitants_in_neighborhood
     - families_with_children_pct
     - price_per_m2_neighborhood
-  extended_features:
-    - floor_level
-    - lease_years_remaining
-    - balcony_flag
-    - backyard_num
   target: price_num
   train_test_split:
     test_size: 0.2
@@ -311,11 +296,6 @@ xgboost_early_stopping:
     - inhabitants_in_neighborhood
     - families_with_children_pct
     - price_per_m2_neighborhood
-  extended_features:
-    - floor_level
-    - lease_years_remaining
-    - balcony_flag
-    - backyard_num
   target: price_num
   train_test_split:
     test_size: 0.2

@@ -1,180 +1,166 @@
-import numpy as np
 import pandas as pd
+import numpy as np
 from .utils import (
     to_float,
     extract_floor,
     extract_lease_years,
     drop_low_variance_dummies,
+    auto_log_transform_train,
+    apply_log_transform,
+    simplify_roof,
+    simplify_ownership,
+    simplify_location,
 )
 from .encoding import encode_energy_label
 
 
-def auto_log_transform(df, numeric_cols, threshold_skew=0.5):
-    """Automatically log-transform skewed positive numeric features."""
-    log_cols = []
-    for col in numeric_cols:
-        if (df[col] > 0).all():
-            skewness = df[col].skew()
-            if abs(skewness) > threshold_skew:
-                df[f"log_{col}"] = np.log1p(df[col])
-                log_cols.append(f"log_{col}")
-    return log_cols
+def prepare_features_train_val(
+    df_train: pd.DataFrame,
+    df_val: pd.DataFrame = None,
+    numeric_features=None,
+    binary_flags=None,
+    threshold_skew=0.5,
+    encode_energy=True,
+):
+    """
+    Prepare train/val features with safe transformations for CV or Optuna.
 
+    Returns:
+        X_train, X_val, y_train, y_val, meta
+    """
+    df_train = df_train.copy()
+    df_val = df_val.copy() if df_val is not None else None
 
-def simplify_roof(roof):
-    if pd.isna(roof) or roof == "N/A":
-        return "Unknown"
-    if "Plat dak" in roof:
-        return "Flat"
-    if "Zadeldak" in roof:
-        return "Saddle"
-    if "Samengesteld dak" in roof:
-        return "Composite"
-    if "Mansarde" in roof:
-        return "Mansard"
-    return "Other"
-
-
-def simplify_ownership(x):
-    if pd.isna(x) or x.strip() == "":
-        return "Unknown"
-    if "Volle eigendom" in x:
-        return "Full"
-    if "Erfpacht" in x and "Gemeentelijk" in x:
-        return "Municipal"
-    if "Erfpacht" in x:
-        return "Leasehold"
-    return "Other"
-
-
-def simplify_location(x):
-    if pd.isna(x):
-        return "Unknown"
-    if "centrum" in x:
-        return "Central"
-    if "woonwijk" in x:
-        return "Residential"
-    if "vrij uitzicht" in x:
-        return "OpenView"
-    if "park" in x:
-        return "Park"
-    return "Other"
-
-
-def prepare_features(df: pd.DataFrame):
-    """Full feature engineering pipeline for modeling."""
-    df = df.copy()
-
-    # 1. Numeric features
-    numeric_features = [
-        "size_num",
-        "contribution_vve_num",
-        "external_storage_num",
-        "living_area",
-        "nr_rooms",
-        "bathrooms",
-        "toilets",
-        "num_facilities",
-        "inhabitants_in_neighborhood",
-        "families_with_children_pct",
-        "price_per_m2_neighborhood",
-    ]
-    for col in numeric_features:
-        df[col] = df[col].apply(to_float)
-        df[col] = df[col].fillna(df[col].median())
-
-    log_cols = auto_log_transform(df, numeric_features)
-
-    # 2. Binary flags
-    binary_flags = [
-        "has_mechanische_ventilatie",
-        "has_tv_kabel",
-        "has_lift",
-        "has_natuurlijke_ventilatie",
-        "has_n/a",
-        "has_schuifpui",
-        "has_glasvezelkabel",
-        "has_frans_balkon",
-        "has_buitenzonwering",
-        "has_zonnepanelen",
-    ]
-    for col in binary_flags:
-        df[col] = df[col].fillna(0).astype(int)
-
-    # 3. Extra numeric features
-    df["floor_level"] = df["located_on"].apply(extract_floor)
-    df["lease_years_remaining"] = (
-        df["ownership_type"].apply(extract_lease_years).fillna(0)
-    )
-    df["backyard_num"] = df["backyard"].apply(to_float).fillna(0)
-    df["balcony_flag"] = df["balcony"].apply(
-        lambda x: 0 if pd.isna(x) or x == "N/A" else 1
-    )
-
-    # 4. Energy label
-    df, encoder_energy = encode_energy_label(
-        df, column="energy_label", fit=True
-    )
-
-    # 5. Categorical OHE
-    postal_ohe = pd.get_dummies(
-        df["postal_code_clean"].str[:3], prefix="district", drop_first=True
-    )
-    status_ohe = pd.get_dummies(
-        df["status"].fillna("N/A"), prefix="status", drop_first=True
-    )
-    roof_ohe = pd.get_dummies(
-        df["roof_type"].apply(simplify_roof), prefix="roof", drop_first=True
-    )
-    ownership_ohe = pd.get_dummies(
-        df["ownership_type"].apply(simplify_ownership),
-        prefix="ownership",
-        drop_first=True,
-    )
-    location_ohe = pd.get_dummies(
-        df["location"].apply(simplify_location),
-        prefix="location",
-        drop_first=True,
-    )
-    garden_ohe = pd.get_dummies(
-        df["garden"].fillna("None"), prefix="garden", drop_first=True
-    )
-
-    ohe_all = pd.concat(
-        [
-            postal_ohe,
-            status_ohe,
-            roof_ohe,
-            ownership_ohe,
-            location_ohe,
-            garden_ohe,
-        ],
-        axis=1,
-    )
-    ohe_reduced, dropped_cols = drop_low_variance_dummies(ohe_all)
-
-    # 6. Combine features
-    model_features = (
-        log_cols
-        + binary_flags
-        + numeric_features
-        + [
-            "floor_level",
-            "lease_years_remaining",
-            "backyard_num",
-            "balcony_flag",
-            "energy_label_encoded",
+    # -------------------
+    # Numeric features
+    # -------------------
+    if numeric_features is None:
+        numeric_features = [
+            "size_num",
+            "contribution_vve_num",
+            "external_storage_num",
+            "living_area",
+            "nr_rooms",
+            "bathrooms",
+            "toilets",
+            "num_facilities",
+            "inhabitants_in_neighborhood",
+            "families_with_children_pct",
+            "price_per_m2_neighborhood",
         ]
-    )
-    X = pd.concat([df[model_features], ohe_reduced], axis=1)
-    y = df["price_num"]
 
-    return (
-        X,
-        y,
-        log_cols,
-        {
-            "energy_label": encoder_energy,
-            "ohe_columns": ohe_reduced.columns.tolist(),
-        },
-    )
+    for col in numeric_features:
+        df_train[col] = df_train[col].apply(to_float).fillna(df_train[col].median())
+        if df_val is not None:
+            df_val[col] = df_val[col].apply(to_float).fillna(df_train[col].median())
+
+    # Log-transform on TRAIN only
+    df_train, log_cols = auto_log_transform_train(df_train, numeric_features, threshold_skew)
+    if df_val is not None:
+        df_val = apply_log_transform(df_val, log_cols)
+
+    # -------------------
+    # Binary flags
+    # -------------------
+    if binary_flags is None:
+        binary_flags = [
+            "has_mechanische_ventilatie",
+            "has_tv_kabel",
+            "has_lift",
+            "has_natuurlijke_ventilatie",
+            "has_n/a",
+            "has_schuifpui",
+            "has_glasvezelkabel",
+            "has_frans_balkon",
+            "has_buitenzonwering",
+            "has_zonnepanelen",
+        ]
+
+    for col in binary_flags:
+        df_train[col] = df_train[col].fillna(0).astype(int)
+        if df_val is not None:
+            df_val[col] = df_val[col].fillna(0).astype(int)
+
+    # -------------------
+    # Extra numeric features
+    # -------------------
+    for df in [df_train] + ([df_val] if df_val is not None else []):
+        df["floor_level"] = df["located_on"].apply(extract_floor)
+        df["lease_years_remaining"] = df["ownership_type"].apply(extract_lease_years).fillna(0)
+        df["backyard_num"] = df["backyard"].apply(to_float).fillna(0)
+        df["balcony_flag"] = df["balcony"].apply(lambda x: 0 if pd.isna(x) or x == "N/A" else 1)
+
+    # -------------------
+    # Energy label
+    # -------------------
+    if encode_energy:
+        df_train, encoder_energy = encode_energy_label(df_train, column="energy_label", fit=True)
+        if df_val is not None:
+            df_val, _ = encode_energy_label(df_val, column="energy_label", encoder=encoder_energy, fit=False)
+
+    # -------------------
+    # Categorical OHE
+    # -------------------
+    cat_cols = {
+        "postal_district": df_train["postal_code_clean"].str[:3],
+        "status": df_train["status"].fillna("N/A"),
+        "roof_type": df_train["roof_type"].apply(simplify_roof),
+        "ownership_type": df_train["ownership_type"].apply(simplify_ownership),
+        "location": df_train["location"].apply(simplify_location),
+        "garden": df_train["garden"].fillna("None"),
+    }
+
+    ohe_train_list = []
+    ohe_val_list = []
+    ohe_columns_list = []
+
+    for col_name, series in cat_cols.items():
+        ohe = pd.get_dummies(series, prefix=col_name, drop_first=True)
+        ohe_train_list.append(ohe)
+        ohe_columns_list.extend(ohe.columns.tolist())
+
+        if df_val is not None:
+            val_series = df_val[col_name]
+            val_ohe = pd.get_dummies(val_series, prefix=col_name, drop_first=True)
+            # Align columns
+            for c in ohe.columns:
+                if c not in val_ohe:
+                    val_ohe[c] = 0
+            val_ohe = val_ohe[ohe.columns]
+            ohe_val_list.append(val_ohe)
+
+    # Concatenate OHE and drop low-variance based on TRAIN only
+    ohe_train_concat = pd.concat(ohe_train_list, axis=1)
+    ohe_train_reduced, dropped_cols = drop_low_variance_dummies(ohe_train_concat)
+
+    if df_val is not None:
+        ohe_val_concat = pd.concat(ohe_val_list, axis=1)
+        ohe_val_reduced = ohe_val_concat.drop(columns=dropped_cols, errors="ignore")
+    else:
+        ohe_val_reduced = None
+
+    # -------------------
+    # Combine all features
+    # -------------------
+    model_features = numeric_features + log_cols + binary_flags + [
+        "floor_level",
+        "lease_years_remaining",
+        "backyard_num",
+        "balcony_flag",
+        "energy_label_encoded",
+    ]
+
+    X_train = pd.concat([df_train[model_features], ohe_train_reduced], axis=1)
+    X_val = pd.concat([df_val[model_features], ohe_val_reduced], axis=1) if df_val is not None else None
+
+    y_train = df_train["price_num"]
+    y_val = df_val["price_num"] if df_val is not None else None
+
+    meta = {
+        "log_cols": log_cols,
+        "encoder_energy": encoder_energy,
+        "ohe_columns": ohe_train_reduced.columns.tolist(),
+        "dropped_ohe_columns": dropped_cols,
+    }
+
+    return X_train, X_val, y_train, y_val, meta
