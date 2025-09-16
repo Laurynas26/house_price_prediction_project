@@ -1,9 +1,11 @@
 import yaml
 import numpy as np
+import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
 from src.features.feature_engineering.feature_engineering import (
     prepare_features_train_val,
+    prepare_features_test,
 )
 from src.features.feature_engineering.encoding import (
     encode_energy_labels_train_test_val,
@@ -68,38 +70,50 @@ def scale_data(X_train, X_test, X_val=None, scaler_cls=StandardScaler):
 
 
 def prepare_data(
-    df, config_path, model_name, use_extended_features=False, cv=False
+    df: pd.DataFrame,
+    config_path: str,
+    model_name: str,
+    use_extended_features: bool = False,
+    cv: bool = False,
 ):
     """
-    Prepare data for modeling with optional extended feature engineering and energy_label encoding.
+    Main entry point for preparing data splits and feature engineering.
+
+    Modes:
+        - Normal training/testing:
+            Splits into train/test (+ optional val if config says so).
+            Applies extended feature engineering to all splits (train/val/test).
+        - Cross-validation (cv=True):
+            Splits into train/val only (per fold).
+            Applies extended feature engineering only to train/val (no test prep).
 
     Args:
-        df (pd.DataFrame): Input dataset.
-        config_path (str/Path): Path to YAML config for features and model.
-        model_name (str): Key in YAML specifying which model's config to load.
+        df (pd.DataFrame): Raw dataset.
+        config_path (str): Path to YAML config controlling features and splits.
+        model_name (str): Model name (used to select config options).
         use_extended_features (bool): Whether to apply extended feature engineering.
-        cv (bool): If True, skip global energy_label encoding (will be handled fold-wise in CV).
-                   If False, encode energy_label for all splits.
+        cv (bool): If True, skip test transformations (CV handles val folds only).
 
     Returns:
         X_train (pd.DataFrame): Training features.
-        X_test (pd.DataFrame): Test features.
+        X_test (pd.DataFrame | None): Test features, or None if cv=True.
         y_train (pd.Series): Training target.
-        y_test (pd.Series): Test target.
-        scaler (sklearn Scaler or None): Fitted scaler object.
-        X_val (pd.DataFrame or None): Validation features (if configured).
-        y_val (pd.Series or None): Validation target (if configured).
-        fe_encoders (dict): Dictionary of fitted feature encoders (includes energy_label if cv=False).
+        y_test (pd.Series | None): Test target, or None if cv=True.
+        X_val (pd.DataFrame | None): Validation features (if config includes val split).
+        y_val (pd.Series | None): Validation target.
+        scaler (sklearn transformer | None): Fitted scaler, if scaling applied.
+        meta (dict): Metadata/encoders for feature engineering.
     """
-    # Load features, target, and config
+    # --- Load config ---
     features, target, split_cfg, scaling_cfg = load_features_config(
         config_path, model_name
     )
     X, y = select_and_clean(df, features, target)
 
-    # Split train/test (+ optional val)
+    # --- Train/test/(val) split ---
     val_required = split_cfg.get("val_required", False)
     val_size = split_cfg.get("val_size", 0.1)
+
     split_result = split_train_val_test_data(
         X,
         y,
@@ -108,33 +122,56 @@ def prepare_data(
         val_required=val_required,
         val_size=val_size,
     )
+
     if val_required:
         X_train, X_val, X_test, y_train, y_val, y_test = split_result
     else:
         X_train, X_test, y_train, y_test = split_result
         X_val, y_val = None, None
 
-    # Optional extended feature engineering
-    if use_extended_features:
-        if X_val is not None:
-            X_train, X_val, X_test, fe_encoders = prepare_features_train_val(
-                X_train, X_val, X_test
-            )
-        else:
-            X_train, _, X_test, fe_encoders = prepare_features_train_val(
-                X_train, None, X_test
-            )
-    else:
-        fe_encoders = {}
+    meta = {}
+    fe_encoders = {}
 
-    # Encode energy_label globally only if not doing CV
+    # --- Extended FE ---
+    if use_extended_features:
+        if cv:
+            # Train/val only for CV
+            X_train, X_val, y_train, y_val, meta = prepare_features_train_val(
+                pd.concat([X_train, y_train], axis=1),
+                (
+                    pd.concat([X_val, y_val], axis=1)
+                    if X_val is not None
+                    else None
+                ),
+            )
+            X_test, y_test = None, None
+        else:
+            # Train/val
+            X_train, X_val, y_train, y_val, meta = prepare_features_train_val(
+                pd.concat([X_train, y_train], axis=1),
+                (
+                    pd.concat([X_val, y_val], axis=1)
+                    if X_val is not None
+                    else None
+                ),
+            )
+            # Test
+            X_test = (
+                prepare_features_test(
+                    pd.concat([X_test, y_test], axis=1), meta
+                )
+                if X_test is not None
+                else None
+            )
+
+    # --- Energy label encoding globally if not CV and not extended FE ---
     if not cv and not use_extended_features:
         X_train, X_test, X_val, energy_enc = (
             encode_energy_labels_train_test_val(X_train, X_test, X_val)
         )
         fe_encoders["energy_label"] = energy_enc
 
-    # Scale features if required
+    # --- Scaling ---
     if scaling_cfg.get("scale", True):
         scaler_cls = SCALERS.get(
             scaling_cfg.get("method", "StandardScaler"), StandardScaler
@@ -145,4 +182,13 @@ def prepare_data(
     else:
         scaler = None
 
-    return X_train, X_test, y_train, y_test, scaler, X_val, y_val, fe_encoders
+    return (
+        X_train,
+        X_test,
+        y_train,
+        y_test,
+        X_val,
+        y_val,
+        scaler,
+        {**meta, **fe_encoders},
+    )
