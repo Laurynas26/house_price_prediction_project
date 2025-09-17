@@ -267,6 +267,7 @@ xgboost_early_stopping:
     - nr_rooms
     - bathrooms
     - toilets
+    # - living_area
     - contribution_vve_num
     - external_storage_num
     - has_mechanische_ventilatie

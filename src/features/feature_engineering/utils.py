@@ -62,8 +62,9 @@ def apply_log_transform(df, log_cols):
 
 
 def simplify_roof(roof):
-    if pd.isna(roof) or roof == "N/A":
+    if pd.isna(roof) or str(roof) == "N/A":
         return "Unknown"
+    roof = str(roof)
     if "Plat dak" in roof:
         return "Flat"
     if "Zadeldak" in roof:
@@ -76,8 +77,9 @@ def simplify_roof(roof):
 
 
 def simplify_ownership(x):
-    if pd.isna(x) or x.strip() == "":
+    if pd.isna(x) or str(x).strip() == "":
         return "Unknown"
+    x = str(x)
     if "Volle eigendom" in x:
         return "Full"
     if "Erfpacht" in x and "Gemeentelijk" in x:
@@ -90,6 +92,7 @@ def simplify_ownership(x):
 def simplify_location(x):
     if pd.isna(x):
         return "Unknown"
+    x = str(x)
     if "centrum" in x:
         return "Central"
     if "woonwijk" in x:

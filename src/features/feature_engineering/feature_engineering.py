@@ -74,7 +74,9 @@ def prepare_features_train_val(
             df_val[col] = df_val[col].apply(to_float).fillna(median_val)
 
     # Log-transform on TRAIN only
-    df_train, log_cols = auto_log_transform_train(df_train, numeric_features, threshold_skew)
+    df_train, log_cols = auto_log_transform_train(
+        df_train, numeric_features, threshold_skew
+    )
     if df_val is not None:
         df_val = apply_log_transform(df_val, log_cols)
 
@@ -105,25 +107,46 @@ def prepare_features_train_val(
     # -------------------
     for df in [df_train] + ([df_val] if df_val is not None else []):
         df["floor_level"] = df["located_on"].apply(extract_floor)
-        df["lease_years_remaining"] = df["ownership_type"].apply(extract_lease_years).fillna(0)
+        df["lease_years_remaining"] = (
+            df["ownership_type"].apply(extract_lease_years).fillna(0)
+        )
         df["backyard_num"] = df["backyard"].apply(to_float).fillna(0)
-        df["balcony_flag"] = df["balcony"].apply(lambda x: 0 if pd.isna(x) or x == "N/A" else 1)
+        df["balcony_flag"] = df["balcony"].apply(
+            lambda x: 0 if pd.isna(x) or x == "N/A" else 1
+        )
 
     # -------------------
     # Energy label
     # -------------------
     if encode_energy:
-        df_train, encoder_energy = encode_energy_label(df_train, column="energy_label", fit=True)
+        df_train, encoder_energy = encode_energy_label(
+            df_train, column="energy_label", fit=True
+        )
         if df_val is not None:
-            df_val, _ = encode_energy_label(df_val, column="energy_label", encoder=encoder_energy, fit=False)
+            df_val, _ = encode_energy_label(
+                df_val,
+                column="energy_label",
+                encoder=encoder_energy,
+                fit=False,
+            )
     else:
         encoder_energy = None
+
+    # --- Create postal_district from postal_code_clean ---
+    if "postal_code_clean" in df_train.columns:
+        df_train["postal_district"] = (
+            df_train["postal_code_clean"].astype(str).str[:3]
+        )
+        if df_val is not None and "postal_code_clean" in df_val.columns:
+            df_val["postal_district"] = (
+                df_val["postal_code_clean"].astype(str).str[:3]
+            )
 
     # -------------------
     # Categorical OHE
     # -------------------
     cat_cols = {
-        "postal_district": df_train["postal_code_clean"].str[:3],
+        "postal_district": df_train["postal_district"],
         "status": df_train["status"].fillna("N/A"),
         "roof_type": df_train["roof_type"].apply(simplify_roof),
         "ownership_type": df_train["ownership_type"].apply(simplify_ownership),
@@ -140,7 +163,9 @@ def prepare_features_train_val(
 
         if df_val is not None:
             val_series = df_val[col_name]
-            val_ohe = pd.get_dummies(val_series, prefix=col_name, drop_first=True)
+            val_ohe = pd.get_dummies(
+                val_series, prefix=col_name, drop_first=True
+            )
             for c in ohe.columns:
                 if c not in val_ohe:
                     val_ohe[c] = 0
@@ -148,27 +173,40 @@ def prepare_features_train_val(
             ohe_val_list.append(val_ohe)
 
     ohe_train_concat = pd.concat(ohe_train_list, axis=1)
-    ohe_train_reduced, dropped_cols = drop_low_variance_dummies(ohe_train_concat)
+    ohe_train_reduced, dropped_cols = drop_low_variance_dummies(
+        ohe_train_concat
+    )
 
     if df_val is not None:
         ohe_val_concat = pd.concat(ohe_val_list, axis=1)
-        ohe_val_reduced = ohe_val_concat.drop(columns=dropped_cols, errors="ignore")
+        ohe_val_reduced = ohe_val_concat.drop(
+            columns=dropped_cols, errors="ignore"
+        )
     else:
         ohe_val_reduced = None
 
     # -------------------
     # Combine all features
     # -------------------
-    model_features = numeric_features + log_cols + binary_flags + [
-        "floor_level",
-        "lease_years_remaining",
-        "backyard_num",
-        "balcony_flag",
-        "energy_label_encoded",
-    ]
+    model_features = (
+        numeric_features
+        + log_cols
+        + binary_flags
+        + [
+            "floor_level",
+            "lease_years_remaining",
+            "backyard_num",
+            "balcony_flag",
+            "energy_label_encoded",
+        ]
+    )
 
     X_train = pd.concat([df_train[model_features], ohe_train_reduced], axis=1)
-    X_val = pd.concat([df_val[model_features], ohe_val_reduced], axis=1) if df_val is not None else None
+    X_val = (
+        pd.concat([df_val[model_features], ohe_val_reduced], axis=1)
+        if df_val is not None
+        else None
+    )
 
     y_train = df_train["price_num"]
     y_val = df_val["price_num"] if df_val is not None else None
@@ -206,7 +244,11 @@ def prepare_features_test(df_test: pd.DataFrame, meta: dict):
     # Numeric features
     # -------------------
     for col in meta["numeric_features"]:
-        df_test[col] = df_test[col].apply(to_float).fillna(meta["train_medians"].get(col, 0))
+        df_test[col] = (
+            df_test[col]
+            .apply(to_float)
+            .fillna(meta["train_medians"].get(col, 0))
+        )
 
     # Apply log transforms
     df_test = apply_log_transform(df_test, meta["log_cols"])
@@ -221,15 +263,21 @@ def prepare_features_test(df_test: pd.DataFrame, meta: dict):
     # Extra numeric features
     # -------------------
     df_test["floor_level"] = df_test["located_on"].apply(extract_floor)
-    df_test["lease_years_remaining"] = df_test["ownership_type"].apply(extract_lease_years).fillna(0)
+    df_test["lease_years_remaining"] = (
+        df_test["ownership_type"].apply(extract_lease_years).fillna(0)
+    )
     df_test["backyard_num"] = df_test["backyard"].apply(to_float).fillna(0)
-    df_test["balcony_flag"] = df_test["balcony"].apply(lambda x: 0 if pd.isna(x) or x == "N/A" else 1)
+    df_test["balcony_flag"] = df_test["balcony"].apply(
+        lambda x: 0 if pd.isna(x) or x == "N/A" else 1
+    )
 
     # -------------------
     # Energy label
     # -------------------
     if meta["encoder_energy"] is not None:
-        df_test, _ = encode_energy_label(df_test, encoder=meta["encoder_energy"], fit=False)
+        df_test, _ = encode_energy_label(
+            df_test, encoder=meta["encoder_energy"], fit=False
+        )
 
     # -------------------
     # Categorical OHE
@@ -246,7 +294,9 @@ def prepare_features_test(df_test: pd.DataFrame, meta: dict):
     ohe_test_list = []
     for col_name, series in cat_cols.items():
         ohe = pd.get_dummies(series, prefix=col_name, drop_first=True)
-        train_ohe_cols = [c for c in meta["ohe_columns"] if c.startswith(col_name)]
+        train_ohe_cols = [
+            c for c in meta["ohe_columns"] if c.startswith(col_name)
+        ]
         for c in train_ohe_cols:
             if c not in ohe:
                 ohe[c] = 0
@@ -262,9 +312,17 @@ def prepare_features_test(df_test: pd.DataFrame, meta: dict):
         meta["numeric_features"]
         + meta["log_cols"]
         + meta["binary_flags"]
-        + ["floor_level", "lease_years_remaining", "backyard_num", "balcony_flag", "energy_label_encoded"]
+        + [
+            "floor_level",
+            "lease_years_remaining",
+            "backyard_num",
+            "balcony_flag",
+            "energy_label_encoded",
+        ]
     )
 
-    X_test_transformed = pd.concat([df_test[model_features], ohe_test_concat], axis=1)
+    X_test_transformed = pd.concat(
+        [df_test[model_features], ohe_test_concat], axis=1
+    )
 
     return X_test_transformed
