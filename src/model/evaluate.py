@@ -74,7 +74,6 @@ class ModelEvaluator:
                     "Validation set must be provided for XGBoost early"
                     " stopping."
                 )
-
             dtrain = xgb.DMatrix(X_train, label=y_train_trans)
             dval = xgb.DMatrix(X_val, label=y_val_trans)
             evals = [(dval, "validation")]

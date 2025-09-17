@@ -34,10 +34,30 @@ def load_features_config(config_path, model_name):
     return features, target, split_cfg, scaling_cfg
 
 
-def select_and_clean(df, features, target):
+def select_and_clean(df, features, target, extended_fe=False):
     """Select columns and handle missing values."""
-    X = df[features].replace("N/A", np.nan).fillna(0)
-    y = df[target]
+    df_copy = df.copy()
+
+    if extended_fe:
+        # Extra raw columns required by extended feature engineering
+        extra_cols = [
+            "located_on",
+            "ownership_type",
+            "backyard",
+            "balcony",
+            "energy_label",
+            "postal_code_clean",
+            "status",
+            "roof_type",
+            "location",
+            "garden",
+        ]
+        cols_to_keep = list(set(features + [target] + extra_cols))
+    else:
+        cols_to_keep = list(set(features + [target]))
+
+    X = df_copy[cols_to_keep].replace("N/A", np.nan).fillna(0)
+    y = df_copy[target]
     return X, y
 
 
@@ -108,7 +128,11 @@ def prepare_data(
     features, target, split_cfg, scaling_cfg = load_features_config(
         config_path, model_name
     )
-    X, y = select_and_clean(df, features, target)
+
+    # --- Select columns safely ---
+    X, y = select_and_clean(
+        df, features, target, extended_fe=use_extended_features
+    )
 
     # --- Train/test/(val) split ---
     val_required = split_cfg.get("val_required", False)
@@ -134,40 +158,33 @@ def prepare_data(
 
     # --- Extended FE ---
     if use_extended_features:
+        # ✅ Ensure DataFrames with target included for FE
+        df_train = pd.concat([X_train, y_train], axis=1)
+        df_val = pd.concat([X_val, y_val], axis=1) if X_val is not None else None
+        df_test = pd.concat([X_test, y_test], axis=1) if X_test is not None else None
+
         if cv:
             # Train/val only for CV
             X_train, X_val, y_train, y_val, meta = prepare_features_train_val(
-                pd.concat([X_train, y_train], axis=1),
-                (
-                    pd.concat([X_val, y_val], axis=1)
-                    if X_val is not None
-                    else None
-                ),
+                df_train, df_val
             )
             X_test, y_test = None, None
         else:
             # Train/val
             X_train, X_val, y_train, y_val, meta = prepare_features_train_val(
-                pd.concat([X_train, y_train], axis=1),
-                (
-                    pd.concat([X_val, y_val], axis=1)
-                    if X_val is not None
-                    else None
-                ),
+                df_train, df_val
             )
             # Test
             X_test = (
-                prepare_features_test(
-                    pd.concat([X_test, y_test], axis=1), meta
-                )
-                if X_test is not None
+                prepare_features_test(df_test, meta)
+                if df_test is not None
                 else None
             )
 
     # --- Energy label encoding globally if not CV and not extended FE ---
     if not cv and not use_extended_features:
-        X_train, X_test, X_val, energy_enc = (
-            encode_energy_labels_train_test_val(X_train, X_test, X_val)
+        X_train, X_test, X_val, energy_enc = encode_energy_labels_train_test_val(
+            X_train, X_test, X_val
         )
         fe_encoders["energy_label"] = energy_enc
 
