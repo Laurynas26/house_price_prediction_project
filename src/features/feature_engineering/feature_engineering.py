@@ -25,23 +25,26 @@ def prepare_features_train_val(
     """
     Prepare train and optional validation features for modeling.
 
-    Handles numeric, binary, extra numeric, energy label encoding, and categorical OHE.
-    Designed to support CV workflows (only train/val) or final train/test preparation.
+    Handles:
+      - Numeric features (fillna, float conversion)
+      - Log-transforms
+      - Binary flags
+      - Extra numeric features (floor_level, lease_years_remaining, backyard, balcony)
+      - Energy label encoding
+      - Categorical OHE (aligned train/val)
 
     Args:
-        df_train (pd.DataFrame): Training dataset.
-        df_val (pd.DataFrame, optional): Validation dataset. Defaults to None.
-        numeric_features (list, optional): List of numeric columns. Defaults to predefined list.
-        binary_flags (list, optional): List of binary flag columns. Defaults to predefined list.
-        threshold_skew (float, optional): Threshold for automatic log-transform on numeric columns.
-        encode_energy (bool, optional): Whether to encode 'energy_label'. Defaults to True.
+        df_train: Training dataframe (features only, target excluded)
+        df_val: Optional validation dataframe
+        numeric_features: List of numeric columns
+        binary_flags: List of binary flag columns
+        threshold_skew: Threshold for log-transform
+        encode_energy: Whether to encode energy label
 
     Returns:
-        X_train (pd.DataFrame): Transformed training features.
-        X_val (pd.DataFrame or None): Transformed validation features (if df_val provided).
-        y_train (pd.Series): Training target.
-        y_val (pd.Series or None): Validation target (if df_val provided).
-        meta (dict): Metadata needed to transform test set, including encoder, medians, OHE info.
+        X_train: Transformed training features
+        X_val: Transformed validation features (or None)
+        meta: Metadata for transforming test set (medians, encoders, OHE columns)
     """
     df_train = df_train.copy()
     df_val = df_val.copy() if df_val is not None else None
@@ -54,7 +57,7 @@ def prepare_features_train_val(
             "size_num",
             "contribution_vve_num",
             "external_storage_num",
-            "living_area",
+            # "living_area",
             "nr_rooms",
             "bathrooms",
             "toilets",
@@ -73,7 +76,9 @@ def prepare_features_train_val(
         if df_val is not None:
             df_val[col] = df_val[col].apply(to_float).fillna(median_val)
 
-    # Log-transform on TRAIN only
+    # -------------------
+    # Log-transform
+    # -------------------
     df_train, log_cols = auto_log_transform_train(
         df_train, numeric_features, threshold_skew
     )
@@ -132,19 +137,18 @@ def prepare_features_train_val(
     else:
         encoder_energy = None
 
-    # --- Create postal_district from postal_code_clean ---
+    # -------------------
+    # Categorical features
+    # -------------------
     if "postal_code_clean" in df_train.columns:
         df_train["postal_district"] = (
             df_train["postal_code_clean"].astype(str).str[:3]
         )
-        if df_val is not None and "postal_code_clean" in df_val.columns:
+        if df_val is not None:
             df_val["postal_district"] = (
                 df_val["postal_code_clean"].astype(str).str[:3]
             )
 
-    # -------------------
-    # Categorical OHE
-    # -------------------
     cat_cols = {
         "postal_district": df_train["postal_district"],
         "status": df_train["status"].fillna("N/A"),
@@ -154,13 +158,11 @@ def prepare_features_train_val(
         "garden": df_train["garden"].fillna("None"),
     }
 
-    ohe_train_list, ohe_val_list, ohe_columns_list = [], [], []
+    ohe_train_list, ohe_val_list = [], []
 
     for col_name, series in cat_cols.items():
         ohe = pd.get_dummies(series, prefix=col_name, drop_first=True)
         ohe_train_list.append(ohe)
-        ohe_columns_list.extend(ohe.columns.tolist())
-
         if df_val is not None:
             val_series = df_val[col_name]
             val_ohe = pd.get_dummies(
@@ -176,17 +178,16 @@ def prepare_features_train_val(
     ohe_train_reduced, dropped_cols = drop_low_variance_dummies(
         ohe_train_concat
     )
-
-    if df_val is not None:
-        ohe_val_concat = pd.concat(ohe_val_list, axis=1)
-        ohe_val_reduced = ohe_val_concat.drop(
+    ohe_val_reduced = (
+        pd.concat(ohe_val_list, axis=1).drop(
             columns=dropped_cols, errors="ignore"
         )
-    else:
-        ohe_val_reduced = None
+        if df_val is not None
+        else None
+    )
 
     # -------------------
-    # Combine all features
+    # Combine features
     # -------------------
     model_features = (
         numeric_features
@@ -208,8 +209,11 @@ def prepare_features_train_val(
         else None
     )
 
-    y_train = df_train["price_num"]
-    y_val = df_val["price_num"] if df_val is not None else None
+    # Ensure numeric/log columns are float
+    for col in numeric_features + log_cols:
+        X_train[col] = X_train[col].astype(float)
+        if X_val is not None:
+            X_val[col] = X_val[col].astype(float)
 
     meta = {
         "log_cols": log_cols,
@@ -221,27 +225,26 @@ def prepare_features_train_val(
         "train_medians": train_medians,
     }
 
-    return X_train, X_val, y_train, y_val, meta
+    return X_train, X_val, meta
 
 
 def prepare_features_test(df_test: pd.DataFrame, meta: dict):
     """
-    Apply the same feature transformations as train/val to the test set.
+    Apply the same transformations to test set as train/val.
 
-    Automatically aligns numeric, binary, extra numeric, energy label encoding, and categorical OHE
-    with the training dataset.
+    Aligns numeric, log-transformed, binary, extra numeric, energy label, and OHE features.
 
     Args:
-        df_test (pd.DataFrame): Raw test DataFrame.
-        meta (dict): Metadata returned from `prepare_features_train_val`.
+        df_test: Raw test features (target excluded)
+        meta: Metadata from prepare_features_train_val
 
     Returns:
-        X_test_transformed (pd.DataFrame): Fully transformed test features.
+        X_test_transformed: Fully transformed test features
     """
     df_test = df_test.copy()
 
     # -------------------
-    # Numeric features
+    # Numeric
     # -------------------
     for col in meta["numeric_features"]:
         df_test[col] = (
@@ -250,18 +253,14 @@ def prepare_features_test(df_test: pd.DataFrame, meta: dict):
             .fillna(meta["train_medians"].get(col, 0))
         )
 
-    # Apply log transforms
+    # Log-transform
     df_test = apply_log_transform(df_test, meta["log_cols"])
 
-    # -------------------
     # Binary flags
-    # -------------------
     for col in meta["binary_flags"]:
         df_test[col] = df_test[col].fillna(0).astype(int)
 
-    # -------------------
-    # Extra numeric features
-    # -------------------
+    # Extra numeric
     df_test["floor_level"] = df_test["located_on"].apply(extract_floor)
     df_test["lease_years_remaining"] = (
         df_test["ownership_type"].apply(extract_lease_years).fillna(0)
@@ -271,19 +270,15 @@ def prepare_features_test(df_test: pd.DataFrame, meta: dict):
         lambda x: 0 if pd.isna(x) or x == "N/A" else 1
     )
 
-    # -------------------
     # Energy label
-    # -------------------
     if meta["encoder_energy"] is not None:
         df_test, _ = encode_energy_label(
             df_test, encoder=meta["encoder_energy"], fit=False
         )
 
-    # -------------------
     # Categorical OHE
-    # -------------------
     cat_cols = {
-        "postal_district": df_test["postal_code_clean"].str[:3],
+        "postal_district": df_test["postal_code_clean"].astype(str).str[:3],
         "status": df_test["status"].fillna("N/A"),
         "roof_type": df_test["roof_type"].apply(simplify_roof),
         "ownership_type": df_test["ownership_type"].apply(simplify_ownership),
@@ -291,23 +286,18 @@ def prepare_features_test(df_test: pd.DataFrame, meta: dict):
         "garden": df_test["garden"].fillna("None"),
     }
 
-    ohe_test_list = []
+    ohe_list = []
     for col_name, series in cat_cols.items():
         ohe = pd.get_dummies(series, prefix=col_name, drop_first=True)
-        train_ohe_cols = [
-            c for c in meta["ohe_columns"] if c.startswith(col_name)
-        ]
-        for c in train_ohe_cols:
+        train_cols = [c for c in meta["ohe_columns"] if c.startswith(col_name)]
+        for c in train_cols:
             if c not in ohe:
                 ohe[c] = 0
-        ohe = ohe[train_ohe_cols]
-        ohe_test_list.append(ohe)
+        ohe = ohe[train_cols]
+        ohe_list.append(ohe)
 
-    ohe_test_concat = pd.concat(ohe_test_list, axis=1)
+    ohe_concat = pd.concat(ohe_list, axis=1)
 
-    # -------------------
-    # Combine all features
-    # -------------------
     model_features = (
         meta["numeric_features"]
         + meta["log_cols"]
@@ -322,7 +312,11 @@ def prepare_features_test(df_test: pd.DataFrame, meta: dict):
     )
 
     X_test_transformed = pd.concat(
-        [df_test[model_features], ohe_test_concat], axis=1
+        [df_test[model_features], ohe_concat], axis=1
     )
+
+    # Ensure numeric/log columns are float
+    for col in meta["numeric_features"] + meta["log_cols"]:
+        X_test_transformed[col] = X_test_transformed[col].astype(float)
 
     return X_test_transformed
