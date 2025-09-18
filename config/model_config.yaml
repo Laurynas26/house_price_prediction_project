@@ -353,3 +353,189 @@ xgboost_early_stopping:
       type: int
       low: 128
       high: 512
+
+xgboost_early_stopping_optuna_feature_eng:
+  features:
+    - size_num
+    - bedrooms
+    - energy_label
+    - year_of_construction
+    - nr_rooms
+    - bathrooms
+    - toilets
+    - contribution_vve_num
+    - external_storage_num
+    - has_mechanische_ventilatie
+    - has_tv_kabel
+    - has_lift
+    - has_natuurlijke_ventilatie
+    - has_n/a
+    - has_schuifpui
+    - has_glasvezelkabel
+    - has_frans_balkon
+    - has_buitenzonwering
+    - has_zonnepanelen
+    - has_airconditioning
+    - has_balansventilatie
+    - has_dakraam
+    - has_alarminstallatie
+    - has_domotica
+    - has_rookkanaal
+    - has_elektra
+    - has_sauna
+    - has_zonnecollectoren
+    - has_cctv
+    - has_rolluiken
+    - has_stromend_water
+    - has_satellietschotel
+    - num_facilities
+    - inhabitants_in_neighborhood
+    - families_with_children_pct
+    - price_per_m2_neighborhood
+    # Extra columns for feature engineering
+    - located_on
+    - ownership_type
+    - backyard
+    - balcony
+    - postal_code_clean
+    - status
+    - roof_type
+    - location
+    - garden
+  target: price_num
+  train_test_split:
+    test_size: 0.2
+    random_state: 42
+    val_required: true
+    val_size: 0.1
+  scaling:
+    scale: false
+  model_params:
+    objective: reg:squarederror
+    max_depth: 6
+    eta: 0.05
+    seed: 42
+  fit_params:
+    num_boost_round: 1000
+    early_stopping_rounds: 50
+    verbose_eval: false
+  search_space:
+    max_depth:
+      type: int
+      low: 3
+      high: 8
+    min_child_weight:
+      type: int
+      low: 1
+      high: 10
+    eta:
+      type: float
+      low: 0.01
+      high: 0.2
+      log: true
+    subsample:
+      type: float
+      low: 0.6
+      high: 0.95
+    colsample_bytree:
+      type: float
+      low: 0.6
+      high: 0.95
+    gamma:
+      type: float
+      low: 0
+      high: 2
+    lambda:
+      type: float
+      low: 0.1
+      high: 10.0
+      log: true
+    alpha:
+      type: float
+      low: 0.0
+      high: 5.0
+    max_bin:
+      type: int
+      low: 128
+      high: 512
+
+random_forest_optuna_feature_eng:
+  features:
+    - size_num
+    - bedrooms
+    - energy_label
+    - year_of_construction
+    - nr_rooms
+    - bathrooms
+    - toilets
+    - contribution_vve_num
+    - external_storage_num
+    - has_mechanische_ventilatie
+    - has_tv_kabel
+    - has_lift
+    - has_natuurlijke_ventilatie
+    - has_n/a
+    - has_schuifpui
+    - has_glasvezelkabel
+    - has_frans_balkon
+    - has_buitenzonwering
+    - has_zonnepanelen
+    - has_airconditioning
+    - has_balansventilatie
+    - has_dakraam
+    - has_alarminstallatie
+    - has_domotica
+    - has_rookkanaal
+    - has_elektra
+    - has_sauna
+    - has_zonnecollectoren
+    - has_cctv
+    - has_rolluiken
+    - has_stromend_water
+    - has_satellietschotel
+    - num_facilities
+    - inhabitants_in_neighborhood
+    - families_with_children_pct
+    - price_per_m2_neighborhood
+    # Extra columns for feature engineering
+    - located_on
+    - ownership_type
+    - backyard
+    - balcony
+    - postal_code_clean
+    - status
+    - roof_type
+    - location
+    - garden
+  target: price_num
+  train_test_split:
+    test_size: 0.2
+    random_state: 42
+    val_required: true
+  scaling:
+    scale: false
+  model_params:
+    n_estimators: 200
+    max_depth: 10
+    random_state: 42
+  fit_params: {}
+  search_space:
+    n_estimators:
+      type: int
+      low: 200
+      high: 1000
+    max_depth:
+      type: int
+      low: 5
+      high: 30
+    min_samples_split:
+      type: int
+      low: 2
+      high: 20
+    min_samples_leaf:
+      type: int
+      low: 2
+      high: 8
+    max_features:
+      type: categorical
+      choices: ["sqrt", "log2", null]
