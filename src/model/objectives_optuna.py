@@ -1,3 +1,4 @@
+import pandas as pd
 import numpy as np
 from sklearn.model_selection import KFold
 from sklearn.ensemble import RandomForestRegressor
@@ -8,7 +9,11 @@ from src.model.utils import (
     suggest_params_from_space,
 )
 from src.model.evaluate import ModelEvaluator
-from src.model.cv_helpers import prepare_base_data, prepare_fold_features
+from src.model.cv_helpers import prepare_base_data
+from src.features.feature_engineering import feature_engineering_cv as fe_cv
+from src.features.feature_engineering.encoding import encode_train_val_only
+
+prepare_fold_features = fe_cv.prepare_fold_features
 
 
 def unified_objective(
@@ -22,28 +27,8 @@ def unified_objective(
     n_splits: int = 5,
 ) -> float:
     """
-    Optuna objective function with K-Fold CV and leakage-safe fold-wise feature engineering.
-
-    This function:
-      - Loads model hyperparameters from config and suggests Optuna trial values.
-      - Prepares the dataset using `prepare_base_data` (no global encoding).
-      - Performs K-Fold cross-validation.
-      - Applies fold-wise feature engineering and safe energy_label encoding using `prepare_fold_features`.
-      - Trains and evaluates the model per fold.
-      - Returns the average validation RMSE for Optuna minimization.
-
-    Args:
-        trial: Optuna trial object for hyperparameter suggestions.
-        model_name: Model identifier ('xgboost', 'random_forest', 'linear', etc.).
-        df: Input dataframe containing features and target.
-        features_config: Path to YAML feature configuration (used inside helpers).
-        model_config: Path to YAML model configuration (used inside helpers).
-        use_log: If True, applies log-transform to the target.
-        use_extended_features: If True, applies full fold-wise feature engineering.
-        n_splits: Number of K-Fold splits.
-
-    Returns:
-        float: Average validation RMSE across all folds.
+    Optuna objective with K-Fold CV and leakage-safe fold-wise feature engineering.
+    Works for baseline (no extended features) and full extended features.
     """
 
     # 1️⃣ Load model config and suggest trial parameters
@@ -54,19 +39,18 @@ def unified_objective(
         trial, model_params, fit_params, search_space
     )
 
-    # Base data prep (before fold-wise FE)
+    # 2️⃣ Base data prep
     X_full, y_full = prepare_base_data(df, features_config, model_name)
-
 
     # Optional log-transform on target
     target_transform = np.log1p if use_log else None
     inverse_transform = np.expm1 if use_log else None
 
-    # 3️⃣ Setup K-Fold CV
+    # 3️⃣ K-Fold CV
     kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
     val_rmse_list = []
 
-    for train_idx, val_idx in kf.split(X_full):
+    for fold, (train_idx, val_idx) in enumerate(kf.split(X_full), 1):
         X_train, X_val = (
             X_full.iloc[train_idx].copy(),
             X_full.iloc[val_idx].copy(),
@@ -76,18 +60,34 @@ def unified_objective(
             y_full.iloc[val_idx].copy(),
         )
 
-        # 4️⃣ Fold-wise feature engineering + safe energy_label encoding
-        X_train, X_val, meta, fold_encoders = prepare_fold_features(
-            X_train, X_val, use_extended_features=use_extended_features
-        )
+        # Baseline: fold-wise encode only energy_label
+        if not use_extended_features:
+            if "energy_label" in X_train.columns:
+                X_train, X_val, _ = encode_train_val_only(X_train, X_val)
 
-        # 5️⃣ Initialize evaluator
+            # Convert any remaining object columns to numeric safely
+            for col in X_train.columns:
+                if X_train[col].dtype == "object":
+                    X_train[col] = pd.to_numeric(X_train[col], errors="coerce")
+                    X_val[col] = pd.to_numeric(X_val[col], errors="coerce")
+
+            # Fill NaNs
+            X_train = X_train.fillna(0)
+            X_val = X_val.fillna(0)
+
+        # Full features: fold-wise feature engineering
+        else:
+            X_train, X_val, meta, fold_encoders = prepare_fold_features(
+                X_train, X_val, use_extended_features=True
+            )
+
+        # 4️⃣ Initialize evaluator
         evaluator = ModelEvaluator(
             target_transform=target_transform,
             inverse_transform=inverse_transform,
         )
 
-        # 6️⃣ Train & evaluate model
+        # 5️⃣ Train & evaluate
         if "xgb" in model_name.lower():
             _, _, _, _, results = evaluator.evaluate(
                 model=None,
@@ -132,5 +132,4 @@ def unified_objective(
 
         val_rmse_list.append(results["test_rmse"])
 
-    # 7️⃣ Return mean validation RMSE
     return float(np.mean(val_rmse_list))

@@ -1,10 +1,5 @@
 import pandas as pd
-import numpy as np
-from src.features.feature_engineering.feature_engineering import (
-    prepare_features_train_val,
-)
-from src.features.feature_engineering.encoding import encode_train_val_only
-
+from src.features.feature_engineering import feature_engineering_cv as fe_cv
 from src.features.data_prep_for_modelling.data_preparation import (
     load_features_config,
 )
@@ -12,30 +7,27 @@ from src.features.data_prep_for_modelling.data_preparation import (
 
 def prepare_base_data(df: pd.DataFrame, features_config: str, model_name: str):
     """
-    Prepare base feature set for CV folds without applying fold-specific feature engineering.
+    Prepare base feature set for CV folds without fold-specific feature engineering.
 
-    Selects the raw features specified in the YAML config for the model, plus the target,
-    and replaces "N/A" with np.nan.
+    Selects features from the YAML config for the model, plus the target,
+    and replaces "N/A" with np.nan for proper feature engineering.
 
     Args:
-        df (pd.DataFrame): Raw cleaned dataframe with precomputed numeric columns (e.g., size_num).
+        df (pd.DataFrame): Raw cleaned dataframe.
         features_config (str): Path to YAML feature configuration.
-        model_name (str): Name of the model to fetch features from the config.
+        model_name (str): Model name to fetch features from the config.
 
     Returns:
-        X_full (pd.DataFrame): Base feature dataframe (pre-FE, no encoding applied yet)
+        X_full (pd.DataFrame): Base feature dataframe (pre-FE, no encoding yet)
         y_full (pd.Series): Target variable
     """
-    # Load features and target from YAML
     features, target, _, _ = load_features_config(features_config, model_name)
 
-    # Ensure target is present
     if target not in df.columns:
         raise KeyError(f"Target column '{target}' not found in dataframe.")
 
     y_full = df[target]
 
-    # Ensure all selected features exist in the dataframe
     missing_cols = [c for c in features if c not in df.columns]
     if missing_cols:
         raise KeyError(
@@ -43,50 +35,23 @@ def prepare_base_data(df: pd.DataFrame, features_config: str, model_name: str):
         )
 
     X_full = df[features].copy()
-
-    # Replace "N/A" with np.nan for proper FE handling
-    X_full.replace("N/A", np.nan, inplace=True)
+    X_full.replace("N/A", pd.NA, inplace=True)
 
     return X_full, y_full
 
 
 def prepare_fold_features(
     X_train: pd.DataFrame,
-    X_val: pd.DataFrame,
+    X_val: pd.DataFrame = None,
     use_extended_features: bool = True,
 ):
     """
-    Apply fold-wise feature engineering safely, avoiding test leakage.
+    CV-safe fold-wise feature engineering wrapper.
 
-    Handles:
-      - Extra numeric features: floor_level, lease_years_remaining, backyard_num, balcony_flag
-      - Log-transforms for skewed numeric features
-      - Binary flags
-      - One-hot encoding for categorical columns
-      - Fold-safe energy_label encoding
-
-    Args:
-        X_train (pd.DataFrame): Training features for the fold
-        X_val (pd.DataFrame): Validation features for the fold
-        use_extended_features (bool): Whether to apply full extended feature engineering
+    Delegates to feature_engineering_cv.prepare_fold_features
+    to avoid recursion and double encoding.
 
     Returns:
-        X_train_fe (pd.DataFrame): Transformed training features
-        X_val_fe (pd.DataFrame): Transformed validation features
-        meta (dict): Metadata from feature engineering (log_cols, encoders, etc.)
-        fold_encoders (dict): Encoders created for this fold
+        X_train_fe, X_val_fe, meta, fold_encoders
     """
-    if not use_extended_features:
-        return X_train, X_val, {}, {}
-
-    X_train_fe, X_val_fe, meta = prepare_features_train_val(X_train, X_val)
-
-    # Fold-safe encoding for energy_label
-    X_train_fe, X_val_fe, energy_encoder = encode_train_val_only(
-        X_train_fe, X_val_fe
-    )
-    meta["energy_label_encoder"] = energy_encoder
-
-    fold_encoders = {"energy_label": energy_encoder}
-
-    return X_train_fe, X_val_fe, meta, fold_encoders
+    return fe_cv.prepare_fold_features(X_train, X_val, use_extended_features)
