@@ -16,8 +16,8 @@ def encode_energy_label(X, column="energy_label", encoder=None, fit=True):
         encoder: fitted OrdinalEncoder
     """
     X = X.copy()
-
-    X[column] = X[column].replace({0: "G"}).replace("N/A", "G")
+    # Ensure no missing values or unknown categories
+    X[column] = X[column].replace({0: "G", "N/A": "G"}).fillna("G")
 
     energy_order = [
         "G",
@@ -42,7 +42,6 @@ def encode_energy_label(X, column="energy_label", encoder=None, fit=True):
         X["energy_label_encoded"] = encoder.transform(X[[column]])
 
     X = X.drop(columns=[column])
-
     return X, encoder
 
 
@@ -64,8 +63,8 @@ def encode_energy_labels_train_test_val(X_train, X_test, X_val=None):
         X_val_encoded = None
     return X_train_encoded, X_test_encoded, X_val_encoded, encoder
 
+
 def encode_train_val_only(X_train, X_val):
     X_train_enc, encoder = encode_energy_label(X_train, fit=True)
     X_val_enc, _ = encode_energy_label(X_val, encoder=encoder, fit=False)
     return X_train_enc, X_val_enc, encoder
-
