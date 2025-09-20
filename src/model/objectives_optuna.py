@@ -27,8 +27,53 @@ def unified_objective(
     n_splits: int = 5,
 ) -> float:
     """
-    Optuna objective with K-Fold CV and leakage-safe fold-wise feature engineering.
-    Works for baseline (no extended features) and full extended features.
+    Objective function for Optuna hyperparameter optimization with leakage-safe
+    K-Fold cross-validation and fold-wise feature engineering.
+
+    This function supports both baseline models (using minimal features with
+    categorical encoding of `energy_label`) and full models with extended
+    feature engineering.
+
+    Workflow:
+        1. Load model configuration and suggest hyperparameters via Optuna trial.
+        2. Prepare base dataset (features + target).
+        3. Apply optional log-transform on the target variable.
+        4. Perform K-Fold CV with fold-wise data preparation:
+            - Baseline: encode only categorical `energy_label`.
+            - Extended: run full feature engineering per fold.
+        5. Train and evaluate model on each fold using `ModelEvaluator`.
+        6. Aggregate validation RMSE across folds and return the mean.
+
+    Parameters
+    ----------
+    trial : optuna.trial.Trial
+        Optuna trial object for hyperparameter sampling.
+    model_name : str
+        Name of the model to train (e.g., "xgb", "rf", "linear").
+    df : pandas.DataFrame
+        Full input dataframe containing features and target.
+    features_config : str
+        Path or identifier for the feature configuration to use.
+    model_config : str
+        Path or identifier for the model configuration and search space.
+    use_log : bool, default=False
+        If True, apply log1p transform to the target during training and
+        expm1 inverse-transform during evaluation.
+    use_extended_features : bool, default=True
+        If True, perform fold-wise extended feature engineering.
+        If False, only encode `energy_label` and basic preprocessing.
+    n_splits : int, default=5
+        Number of folds for cross-validation.
+
+    Returns
+    -------
+    float
+        Mean validation RMSE across folds.
+
+    Raises
+    ------
+    ValueError
+        If the provided `model_name` is not supported.
     """
 
     # 1️⃣ Load model config and suggest trial parameters

@@ -14,6 +14,29 @@ import os
 
 
 class FundaScraper:
+    """
+    Scraper for Funda.nl real estate listings.
+
+    Uses Selenium to load the listing page, waits for key elements, then parses
+    content using BeautifulSoup. Parsing logic is driven by a configurable set
+    of CSS selectors defined in a JSON file.
+
+    Attributes
+    ----------
+    url : str
+        Target Funda listing URL.
+    headless : bool
+        Whether Chrome runs in headless mode.
+    driver : webdriver.Chrome or None
+        Selenium WebDriver instance (initialized in `setup_driver`).
+    soup : BeautifulSoup or None
+        Parsed HTML tree of the loaded page.
+    results : dict
+        Dictionary storing all parsed results.
+    selectors : dict
+        Configuration mapping of element selectors loaded from JSON.
+    """
+
     def __init__(
         self,
         url: str,
@@ -70,7 +93,9 @@ class FundaScraper:
         # ✅ wait for price element (or something guaranteed to exist)
         try:
             WebDriverWait(self.driver, 15).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, self.selectors["basic"]["price"]))
+                EC.presence_of_element_located(
+                    (By.CSS_SELECTOR, self.selectors["basic"]["price"])
+                )
             )
         except Exception:
             print(f"Timeout waiting for {self.url}")
@@ -84,7 +109,7 @@ class FundaScraper:
 
         Args:
             selector (str): CSS selector to find element.
-            default (str, optional): Default text if element not found. 
+            default (str, optional): Default text if element not found.
             Defaults to "N/A".
 
         Returns:
@@ -98,14 +123,14 @@ class FundaScraper:
         self, label_text: str, exact_match: bool = False, default: str = "N/A"
     ) -> str:
         """
-        Extract text from the <dd> element that follows 
+        Extract text from the <dd> element that follows
         a <dt> matching label_text.
 
         Args:
             label_text (str): Text label to find in <dt>.
-            exact_match (bool, optional): Whether match must be exact. 
+            exact_match (bool, optional): Whether match must be exact.
             Defaults to False.
-            default (str, optional): Default text if not found. 
+            default (str, optional): Default text if not found.
             Defaults to "N/A".
 
         Returns:
@@ -308,7 +333,7 @@ class FundaScraper:
 
     def run(self) -> Dict[str, Any]:
         """
-        Run the scraper: 
+        Run the scraper:
         setup driver, fetch page, parse all info, and quit driver.
 
         Returns:
