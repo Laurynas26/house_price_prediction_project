@@ -7,6 +7,9 @@ from src.features.feature_engineering.feature_engineering import (
     prepare_features_train_val,
     prepare_features_test,
 )
+from src.features.feature_engineering.feature_expansion import (
+    feature_expansion,
+)
 from src.features.feature_engineering.encoding import (
     encode_energy_labels_train_test_val,
 )
@@ -185,9 +188,14 @@ def prepare_data(
         # Train/val features only; target not included in FE
         X_train, X_val, meta = prepare_features_train_val(X_train, X_val)
 
+        X_train = feature_expansion(X_train)
+        if X_val is not None:
+            X_val = feature_expansion(X_val)
+
         # Test features
         if not cv and X_test is not None:
             X_test = prepare_features_test(X_test, meta)
+            X_test = feature_expansion(X_test)
 
     # --- Energy label encoding for non-extended pipeline ---
     if not cv and not use_extended_features:

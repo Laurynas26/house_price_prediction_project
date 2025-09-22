@@ -1,11 +1,20 @@
 import numpy as np
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from sklearn.metrics import (
+    mean_squared_error,
+    mean_absolute_error,
+    r2_score,
+)
+from src.model.utils import huber_loss
 import xgboost as xgb
 
 
 class ModelEvaluator:
     def __init__(
-        self, metrics=None, target_transform=None, inverse_transform=None
+        self,
+        metrics=None,
+        target_transform=None,
+        inverse_transform=None,
+        huber_delta=1.0,
     ):
         """
         Evaluate models with optional target transformation and early stopping.
@@ -17,11 +26,15 @@ class ModelEvaluator:
             inverse_transform: function applied to predictions
             to revert transform (e.g., np.expm1)
         """
+        self.huber_delta = huber_delta
         self.metrics = metrics or {
             "rmse": lambda y, y_pred: np.sqrt(mean_squared_error(y, y_pred)),
             "mae": lambda y, y_pred: mean_absolute_error(y, y_pred),
             "r2": r2_score,
             "mape": lambda y, y_pred: np.mean(np.abs((y - y_pred) / y)) * 100,
+            "huber": lambda y, y_pred: huber_loss(
+                y, y_pred, delta=self.huber_delta
+            ),
         }
         self.target_transform = target_transform
         self.inverse_transform = inverse_transform
