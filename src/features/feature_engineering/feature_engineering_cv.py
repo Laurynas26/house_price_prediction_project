@@ -3,6 +3,7 @@ import numpy as np
 from sklearn.preprocessing import OrdinalEncoder
 from .encoding import encode_train_val_only
 from .utils import extract_floor, extract_lease_years, to_float
+from src.features.feature_engineering.feature_expansion import feature_expansion
 
 
 # --------------------------
@@ -266,6 +267,12 @@ def prepare_fold_features(
         if X_val is not None
         else None
     )
+
+    # ---------------- Feature Expansion ----------------
+    if use_extended_features:
+        X_train_final = feature_expansion(X_train_final)
+        if X_val_final is not None:
+            X_val_final = feature_expansion(X_val_final)
 
     meta["extra_numeric_cols"] = extra_numeric_cols
     meta["ohe_columns"] = ohe_train_concat.columns.tolist()
