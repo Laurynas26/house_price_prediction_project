@@ -1,4 +1,5 @@
 import yaml
+import numpy as np
 
 
 def load_model_config_and_search_space(config_path, model_name):
@@ -50,3 +51,22 @@ def suggest_params_from_space(trial, model_params, fit_params, search_space):
             fit_params[name] = val
 
     return model_params, fit_params
+
+
+def huber_loss(y_true, y_pred, delta=1.0):
+    """
+    Huber loss metric.
+
+    Args:
+        y_true: true target values
+        y_pred: predicted values
+        delta: threshold for switching between squared and linear loss
+
+    Returns:
+        float: mean Huber loss
+    """
+    error = y_true - y_pred
+    is_small = np.abs(error) <= delta
+    squared_loss = 0.5 * error**2
+    linear_loss = delta * (np.abs(error) - 0.5 * delta)
+    return np.mean(np.where(is_small, squared_loss, linear_loss))
