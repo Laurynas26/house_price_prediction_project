@@ -12,6 +12,9 @@ from .utils import (
     simplify_location,
 )
 from .encoding import encode_energy_label
+from src.features.feature_engineering.feature_expansion import (
+    feature_expansion,
+)
 
 
 def prepare_features_train_val(
@@ -209,6 +212,15 @@ def prepare_features_train_val(
         else None
     )
 
+    # -------------------
+    # Feature expansion
+    # -------------------
+    pre_exp_cols = set(X_train.columns)
+    X_train = feature_expansion(X_train)
+    if X_val is not None:
+        X_val = feature_expansion(X_val)
+    expanded_features = list(set(X_train.columns) - pre_exp_cols)
+
     # Ensure numeric/log columns are float
     for col in numeric_features + log_cols:
         X_train[col] = X_train[col].astype(float)
@@ -223,6 +235,7 @@ def prepare_features_train_val(
         "numeric_features": numeric_features,
         "binary_flags": binary_flags,
         "train_medians": train_medians,
+        "expanded_features": expanded_features,
     }
 
     return X_train, X_val, meta
@@ -314,6 +327,11 @@ def prepare_features_test(df_test: pd.DataFrame, meta: dict):
     X_test_transformed = pd.concat(
         [df_test[model_features], ohe_concat], axis=1
     )
+
+    # -------------------
+    # Feature expansion
+    # -------------------
+    X_test_transformed = feature_expansion(X_test_transformed)
 
     # Ensure numeric/log columns are float
     for col in meta["numeric_features"] + meta["log_cols"]:

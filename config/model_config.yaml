@@ -412,8 +412,6 @@ xgboost_early_stopping_optuna_feature_eng:
     scale: false
   model_params:
     objective: reg:squarederror
-    max_depth: 6
-    eta: 0.05
     seed: 42
   fit_params:
     num_boost_round: 1000
@@ -422,42 +420,42 @@ xgboost_early_stopping_optuna_feature_eng:
   search_space:
     max_depth:
       type: int
-      low: 3
-      high: 8
+      low: 2
+      high: 3
     min_child_weight:
       type: int
-      low: 1
+      low: 7
       high: 10
     eta:
       type: float
-      low: 0.01
-      high: 0.2
-      log: true
+      low: 0.10
+      high: 0.13
+      log: false
     subsample:
       type: float
-      low: 0.6
-      high: 0.95
+      low: 0.83
+      high: 0.87
     colsample_bytree:
       type: float
-      low: 0.6
-      high: 0.95
+      low: 0.78
+      high: 0.81
     gamma:
       type: float
-      low: 0
-      high: 2
+      low: 0.0
+      high: 0.02
     lambda:
       type: float
-      low: 0.1
-      high: 10.0
-      log: true
+      low: 0.5
+      high: 0.53
+      log: false
     alpha:
       type: float
-      low: 0.0
-      high: 5.0
+      low: 0.17
+      high: 0.19
     max_bin:
       type: int
-      low: 128
-      high: 512
+      low: 265
+      high: 270
 
 random_forest_optuna_feature_eng:
   features:

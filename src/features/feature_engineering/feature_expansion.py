@@ -1,17 +1,17 @@
 import numpy as np
 import pandas as pd
 
+
 def feature_expansion(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Expand features with safe interactions, ratios, and derived metrics,
-    including all amenities, room/space ratios, neighborhood features,
-    age/lease info, and categorical interactions.
-    
+    Expand features with safe row-wise ratios and derived metrics.
+    Ensures consistent engineered columns across folds for CV stability.
+
     Args:
-        df: DataFrame after basic preprocessing & feature encoding.
-        
+        df: DataFrame after base preprocessing & encoding.
+
     Returns:
-        df: DataFrame with added features.
+        df: Expanded DataFrame with engineered features added.
     """
     df = df.copy()
     current_year = 2025
@@ -20,77 +20,104 @@ def feature_expansion(df: pd.DataFrame) -> pd.DataFrame:
     # Size and Rooms
     # -------------------
     df["size_per_room"] = df["size_num"] / df["nr_rooms"].replace(0, np.nan)
-    df["bathroom_per_room"] = df["bathrooms"] / df["nr_rooms"].replace(0, np.nan)
+    df["bathroom_per_room"] = df["bathrooms"] / df["nr_rooms"].replace(
+        0, np.nan
+    )
     df["toilet_per_room"] = df["toilets"] / df["nr_rooms"].replace(0, np.nan)
 
     # -------------------
     # Space Utilization
     # -------------------
-    df["floor_to_size"] = df["floor_level"] / (df["size_num"] + 1e-6)
-    df["external_storage_ratio"] = df["external_storage_num"] / (df["size_num"] + 1e-6)
+    if "floor_level" in df.columns:
+        df["floor_to_size"] = df["floor_level"] / df["size_num"].replace(
+            0, np.nan
+        )
+    else:
+        df["floor_to_size"] = 0
 
-    # -------------------
-    # Amenities / Luxury
-    # -------------------
-    amenities = [
-        "has_mechanische_ventilatie", "has_tv_kabel", "has_lift",
-        "has_natuurlijke_ventilatie", "has_n/a", "has_schuifpui",
-        "has_glasvezelkabel", "has_frans_balkon", "has_buitenzonwering",
-        "has_zonnepanelen", "has_airconditioning", "has_balansventilatie",
-        "has_dakraam", "has_alarminstallatie", "has_domotica",
-        "has_rookkanaal", "has_elektra", "has_sauna",
-        "has_zonnecollectoren", "has_cctv", "has_rolluiken",
-        "has_stromend_water", "has_satellietschotel"
-    ]
-    available_amenities = [col for col in amenities if col in df.columns]
-
-    # sum for total amenities
-    df["amenity_count"] = df[available_amenities].sum(axis=1)
-
-    # amenities per room/floor
-    df["amenities_per_room"] = df["amenity_count"] / (df["nr_rooms"] + 1e-6)
-    df["amenities_per_floor"] = df["amenity_count"] / (df["floor_level"] + 1e-6)
-
-    # optional interaction with age for luxury index
-    if "year_of_construction" in df.columns:
-        df["building_age"] = current_year - df["year_of_construction"].fillna(current_year)
-        df["old_house_flag"] = (df["building_age"] > 100).astype(int)
-        df["amenity_age_index"] = df["amenity_count"] * df["building_age"]
-
-    df["facilities_per_room"] = df["num_facilities"] / (df["nr_rooms"] + 1e-6)
+    df["external_storage_ratio"] = df["external_storage_num"] / df[
+        "size_num"
+    ].replace(0, np.nan)
 
     # -------------------
     # Neighborhood Features
     # -------------------
     if "inhabitants_in_neighborhood" in df.columns:
-        df["inhabitants_per_room"] = df["inhabitants_in_neighborhood"] / (
-            df["nr_rooms"] + 1e-6
-        )
-        df["neighborhood_facility_ratio"] = df["num_facilities"] / (
-            df["inhabitants_in_neighborhood"] + 1e-6
-        )
+        df["inhabitants_per_room"] = df["inhabitants_in_neighborhood"] / df[
+            "nr_rooms"
+        ].replace(0, np.nan)
+
+        df["neighborhood_facility_ratio"] = df["num_facilities"] / df[
+            "inhabitants_in_neighborhood"
+        ].replace(0, np.nan)
+    else:
+        df["inhabitants_per_room"] = 0
+        df["neighborhood_facility_ratio"] = 0
 
     # -------------------
-    # Lease
+    # Building Age / Lease
     # -------------------
-    if "lease_years_remaining" in df.columns and "building_age" in df.columns:
-        df["lease_ratio"] = df["lease_years_remaining"] / (df["building_age"] + 1e-6)
+    if "year_of_construction" in df.columns:
+        df["building_age"] = current_year - df["year_of_construction"].fillna(
+            current_year
+        )
+        df["old_house_flag"] = (df["building_age"] > 100).astype(int)
+    else:
+        df["building_age"] = 0
+        df["old_house_flag"] = 0
 
-    # -------------------
-    # Energy & Roof Interactions
-    # -------------------
-    if "energy_label_encoded" in df.columns and "roof_type" in df.columns:
-        df["roof_simple"] = df["roof_type"].fillna("Other").apply(lambda x: x.split()[0])
-        roof_dummies = pd.get_dummies(df["roof_simple"], prefix="roof")
-        df = pd.concat([df, roof_dummies], axis=1)
-        df["energy_roof_index"] = df["energy_label_encoded"] * roof_dummies.sum(axis=1)
+    if "lease_years_remaining" in df.columns:
+        df["lease_ratio"] = df["lease_years_remaining"] / df[
+            "building_age"
+        ].replace(0, np.nan)
+    else:
+        df["lease_ratio"] = 0
 
     # -------------------
     # Balcony/Backyard Interactions
     # -------------------
     if "balcony_flag" in df.columns and "backyard_num" in df.columns:
-        df["balcony_or_backyard_flag"] = ((df["balcony_flag"] > 0) | (df["backyard_num"] > 0)).astype(int)
-        df["balcony_to_size"] = df["balcony_flag"] / (df["size_num"] + 1e-6)
-        df["backyard_to_size"] = df["backyard_num"] / (df["size_num"] + 1e-6)
+        df["balcony_or_backyard_flag"] = (
+            (df["balcony_flag"] > 0) | (df["backyard_num"] > 0)
+        ).astype(int)
+
+        df["balcony_to_size"] = df["balcony_flag"] / df["size_num"].replace(
+            0, np.nan
+        )
+        df["backyard_to_size"] = df["backyard_num"] / df["size_num"].replace(
+            0, np.nan
+        )
+    else:
+        df["balcony_or_backyard_flag"] = 0
+        df["balcony_to_size"] = 0
+        df["backyard_to_size"] = 0
+
+    # -------------------
+    # Cleanup
+    # -------------------
+    df = df.replace([np.inf, -np.inf], np.nan).fillna(0)
+
+    # -------------------
+    # Column Consistency Guarantee
+    # -------------------
+    expected_features = [
+        "size_per_room",
+        "bathroom_per_room",
+        "toilet_per_room",
+        "floor_to_size",
+        "external_storage_ratio",
+        "inhabitants_per_room",
+        "neighborhood_facility_ratio",
+        "building_age",
+        "old_house_flag",
+        "lease_ratio",
+        "balcony_or_backyard_flag",
+        "balcony_to_size",
+        "backyard_to_size",
+    ]
+
+    for col in expected_features:
+        if col not in df.columns:
+            df[col] = 0  # fill missing engineered features with 0
 
     return df
