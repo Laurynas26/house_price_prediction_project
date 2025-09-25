@@ -24,7 +24,7 @@ def unified_objective(
     model_config: str,
     use_log: bool = False,
     use_extended_features: bool = True,
-    n_splits: int = 5,
+    n_splits: int = 3,
 ) -> float:
     """
     Objective function for Optuna hyperparameter optimization with leakage-safe
@@ -203,6 +203,7 @@ def unified_objective(
         else:
             raise ValueError(f"Unsupported model: {model_name}")
 
-        val_rmse_list.append(results["test_rmse"])
+        val_rmse_list.append(results["val_rmse"])
+
 
     return float(np.mean(val_rmse_list))
