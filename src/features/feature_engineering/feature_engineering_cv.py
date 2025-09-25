@@ -216,7 +216,7 @@ def prepare_fold_features(
             "has_tv_kabel",
             "has_lift",
             "has_natuurlijke_ventilatie",
-            "has_n/a",
+            # "has_n/a",
             "has_schuifpui",
             "has_glasvezelkabel",
             "has_frans_balkon",
