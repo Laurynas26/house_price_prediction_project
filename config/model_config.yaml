@@ -39,7 +39,7 @@ random_forest:
     - has_tv_kabel
     - has_lift
     - has_natuurlijke_ventilatie
-    - has_n/a
+    # - has_n/a
     - has_schuifpui
     - has_glasvezelkabel
     - has_frans_balkon
@@ -110,7 +110,7 @@ random_forest_optuna:
     - has_tv_kabel
     - has_lift
     - has_natuurlijke_ventilatie
-    - has_n/a
+    # - has_n/a
     - has_schuifpui
     - has_glasvezelkabel
     - has_frans_balkon
@@ -143,28 +143,29 @@ random_forest_optuna:
   model_params:
     n_estimators: 200
     max_depth: 10
+    n_jobs: -1
     random_state: 42
   fit_params: {}
   search_space:
     n_estimators:
       type: int
-      low: 200
-      high: 1000
+      low: 600
+      high: 900
     max_depth:
       type: int
-      low: 5
-      high: 30
+      low: 12
+      high: 16
     min_samples_split:
       type: int
-      low: 2
-      high: 20
+      low: 4
+      high: 8
     min_samples_leaf:
       type: int
-      low: 2
-      high: 8
+      low: 3
+      high: 6
     max_features:
       type: categorical
-      choices: ["sqrt", "log2", null]
+      choices: ["sqrt", "log2"]
 
 xgboost:
   features:
@@ -181,7 +182,7 @@ xgboost:
     - has_tv_kabel
     - has_lift
     - has_natuurlijke_ventilatie
-    - has_n/a
+    # - has_n/a
     - has_schuifpui
     - has_glasvezelkabel
     - has_frans_balkon
@@ -274,7 +275,7 @@ xgboost_early_stopping:
     - has_tv_kabel
     - has_lift
     - has_natuurlijke_ventilatie
-    - has_n/a
+    # - has_n/a
     - has_schuifpui
     - has_glasvezelkabel
     - has_frans_balkon
@@ -317,42 +318,43 @@ xgboost_early_stopping:
   search_space:
     max_depth:
       type: int
-      low: 3
-      high: 8
+      low: 5
+      high: 6               # Focus on deeper trees that worked best
     min_child_weight:
       type: int
-      low: 1
-      high: 10
+      low: 6
+      high: 8               # Around best 7
     eta:
       type: float
-      low: 0.01
-      high: 0.2
+      low: 0.025
+      high: 0.03            # Slightly narrower learning rate range
       log: true
     subsample:
       type: float
-      low: 0.6
-      high: 0.95
+      low: 0.84
+      high: 0.87            # Focused around best 0.846
     colsample_bytree:
       type: float
-      low: 0.6
-      high: 0.95
+      low: 0.86
+      high: 0.87            # Focused around best 0.869
     gamma:
       type: float
-      low: 0
-      high: 2
+      low: 3.0
+      high: 3.3             # Narrowed around best 3.12
     lambda:
       type: float
-      low: 0.1
-      high: 10.0
+      low: 9.5
+      high: 10.5            # Narrow L2 range around 10.05
       log: true
     alpha:
       type: float
-      low: 0.0
-      high: 5.0
+      low: 4.2
+      high: 4.5             # Narrow L1 range around 4.38
     max_bin:
       type: int
-      low: 128
-      high: 512
+      low: 340
+      high: 350             # Focused around best 348
+
 
 xgboost_early_stopping_optuna_feature_eng:
   features:
@@ -369,7 +371,7 @@ xgboost_early_stopping_optuna_feature_eng:
     - has_tv_kabel
     - has_lift
     - has_natuurlijke_ventilatie
-    - has_n/a
+    # - has_n/a
     - has_schuifpui
     - has_glasvezelkabel
     - has_frans_balkon
@@ -420,42 +422,43 @@ xgboost_early_stopping_optuna_feature_eng:
   search_space:
     max_depth:
       type: int
-      low: 2
-      high: 3
+      low: 3
+      high: 6
     min_child_weight:
       type: int
       low: 7
-      high: 10
+      high: 10         
     eta:
       type: float
-      low: 0.10
-      high: 0.13
+      low: 0.12
+      high: 0.18
       log: false
     subsample:
       type: float
-      low: 0.83
-      high: 0.87
+      low: 0.75
+      high: 0.9        # Reasonable range to prevent overfitting
     colsample_bytree:
       type: float
-      low: 0.78
-      high: 0.81
+      low: 0.7
+      high: 0.8       # Slightly reduced upper bound to stabilize trees
     gamma:
       type: float
       low: 0.0
-      high: 0.02
+      high: 0.1        # Regularization to prune splits
     lambda:
       type: float
-      low: 0.5
-      high: 0.53
-      log: false
+      low: 0.03       # >0 for log scale
+      high: 0.1
     alpha:
       type: float
-      low: 0.17
-      high: 0.19
+      low: 0.04        # >0 for log scale
+      high: 0.12
     max_bin:
       type: int
-      low: 265
-      high: 270
+      low: 250
+      high: 300        # Smaller bins can improve split precision
+
+
 
 random_forest_optuna_feature_eng:
   features:
@@ -472,7 +475,7 @@ random_forest_optuna_feature_eng:
     - has_tv_kabel
     - has_lift
     - has_natuurlijke_ventilatie
-    - has_n/a
+    # - has_n/a
     - has_schuifpui
     - has_glasvezelkabel
     - has_frans_balkon
@@ -515,25 +518,26 @@ random_forest_optuna_feature_eng:
   model_params:
     n_estimators: 200
     max_depth: 10
+    n_jobs: -1
     random_state: 42
   fit_params: {}
   search_space:
     n_estimators:
       type: int
       low: 200
-      high: 1000
+      high: 600
     max_depth:
       type: int
-      low: 5
-      high: 30
+      low: 12
+      high: 22
     min_samples_split:
       type: int
       low: 2
-      high: 20
+      high: 8
     min_samples_leaf:
       type: int
       low: 2
-      high: 8
+      high: 3
     max_features:
       type: categorical
-      choices: ["sqrt", "log2", null]
+      choices: ["sqrt",  None]

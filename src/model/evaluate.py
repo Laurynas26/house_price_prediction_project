@@ -144,3 +144,99 @@ class ModelEvaluator:
             y_test_pred,
             self.results,
         )
+
+    def evaluate_quantiles(
+        self,
+        X_train,
+        y_train,
+        X_val,
+        y_val,
+        X_test,
+        y_test,
+        quantiles,
+        model_params=None,
+        fit_params=None,
+    ):
+        """Quantile regression evaluation (XGBoost only)"""
+        if X_val is None or y_val is None:
+            raise ValueError("Validation set required for quantile regression")
+
+        # Apply optional target transform
+        y_train_trans = self._apply_transform(y_train)
+        y_val_trans = self._apply_transform(y_val)
+        y_test_trans = self._apply_transform(y_test)
+
+        all_preds_train, all_preds_val, all_preds_test = [], [], []
+        trained_models = []
+
+        for q in quantiles:
+            params = (model_params or {}).copy()
+            params.update(
+                {"objective": "reg:quantileerror", "quantile_alpha": q}
+            )
+
+            dtrain = xgb.DMatrix(X_train, label=y_train_trans)
+            dval = xgb.DMatrix(X_val, label=y_val_trans)
+
+            model = xgb.train(
+                params=params,
+                dtrain=dtrain,
+                num_boost_round=(fit_params or {}).get("num_boost_round", 500),
+                evals=[(dval, "validation")],
+                early_stopping_rounds=(fit_params or {}).get(
+                    "early_stopping_rounds", 50
+                ),
+                verbose_eval=(fit_params or {}).get("verbose_eval", False),
+            )
+
+            trained_models.append(model)  # store model for this quantile
+            all_preds_train.append(model.predict(dtrain))
+            all_preds_val.append(model.predict(dval))
+            all_preds_test.append(model.predict(xgb.DMatrix(X_test)))
+
+        # Stack predictions
+        quantile_preds_train = np.column_stack(all_preds_train)
+        quantile_preds_val = np.column_stack(all_preds_val)
+        quantile_preds_test = np.column_stack(all_preds_test)
+
+        # Median metrics
+        if 0.5 in quantiles:
+            median_idx = quantiles.index(0.5)
+        else:
+            median_idx = len(quantiles) - 1  # fallback
+
+        y_train_pred = self._apply_transform(
+            quantile_preds_train[:, median_idx], inverse=True
+        )
+        y_val_pred = self._apply_transform(
+            quantile_preds_val[:, median_idx], inverse=True
+        )
+        y_test_pred = self._apply_transform(
+            quantile_preds_test[:, median_idx], inverse=True
+        )
+
+        # Compute metrics
+        self.results = {}
+        for name, func in self.metrics.items():
+            self.results[f"train_{name}"] = func(y_train, y_train_pred)
+            self.results[f"val_{name}"] = func(y_val, y_val_pred)
+            self.results[f"test_{name}"] = func(y_test, y_test_pred)
+
+        # Prediction intervals
+        prediction_intervals = {
+            "train": quantile_preds_train,
+            "val": quantile_preds_val,
+            "test": quantile_preds_test,
+        }
+
+        return (
+            trained_models,  # list of all trained quantile models
+            y_train_pred,
+            y_val_pred,
+            y_test_pred,
+            self.results,
+            quantile_preds_train,
+            quantile_preds_val,
+            quantile_preds_test,
+            prediction_intervals,
+        )

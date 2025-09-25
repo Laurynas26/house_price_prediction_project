@@ -104,4 +104,6 @@ def preprocess_df(df, drop_raw: bool = False, numeric_cols: list = None):
         ]
         df = df.drop(columns=columns_to_drop)
 
+    df = df.drop(columns="has_n/a")
+
     return df
