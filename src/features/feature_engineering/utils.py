@@ -12,11 +12,22 @@ def to_float(value):
 
 
 def extract_floor(x):
-    """Extract floor number from string like '3e verdieping'."""
+    """Extract floor number from string like '3e verdieping', safely handling non-scalars."""
+    # If x is a Series, list, or array, take the first element
+    if isinstance(x, (pd.Series, list, np.ndarray)):
+        if len(x) > 0:
+            x = x[0]
+        else:
+            return 0
+
     if pd.isna(x) or x in ["N/A", "Begane grond"]:
         return 0
-    match = re.search(r"(\d+)", str(x))
-    return int(match.group(1)) if match else 0
+
+    try:
+        match = re.search(r"(\d+)", str(x))
+        return int(match.group(1)) if match else 0
+    except Exception:
+        return 0
 
 
 def extract_lease_years(x, current_year=2025):

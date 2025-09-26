@@ -16,7 +16,59 @@ from src.features.feature_engineering.feature_expansion import (
     feature_expansion,
 )
 
+# ------------------- Luxury Amenities -------------------
+LUXURY_AMENITIES = [
+    "has_lift",
+    "has_sauna",
+    "has_domotica",
+    "has_airconditioning",
+    "has_zwembad",
+]
 
+LUXURY_AMENITIES_WEIGHTS = {
+    "has_lift": 1,
+    "has_sauna": 2,
+    "has_domotica": 1.5,
+    "has_airconditioning": 1,
+    "has_zwembad": 3,
+}
+
+
+def add_luxury_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Derive luxury-related features."""
+    df = df.copy()
+    df["luxury_score"] = sum(
+        df[col] * w for col, w in LUXURY_AMENITIES_WEIGHTS.items()
+    )
+    df["num_luxury_facilities"] = df[LUXURY_AMENITIES].sum(axis=1)
+    df["has_high_end_facilities"] = (df["num_luxury_facilities"] >= 3).astype(
+        int
+    )
+    df["luxury_density"] = df["luxury_score"] / df["nr_rooms"].replace(0, 1)
+    df["size_per_luxury"] = df["size_num"] / (df["luxury_score"] + 1)
+    return df
+
+
+def add_luxury_interactions(df: pd.DataFrame) -> pd.DataFrame:
+    """Create domain-specific interactions between luxury features and neighborhood/size metrics."""
+    df = df.copy()
+    if "luxury_score" not in df.columns:
+        raise ValueError(
+            "Run add_luxury_features before add_luxury_interactions"
+        )
+
+    df["luxury_x_price_m2"] = (
+        df["luxury_score"] * df["price_per_m2_neighborhood"]
+    )
+    df["luxury_x_size"] = df["luxury_score"] * df["size_num"]
+    df["luxury_x_inhabitants"] = (
+        df["luxury_score"] * df["inhabitants_in_neighborhood"]
+    )
+
+    return df
+
+
+# ------------------- Training / Validation -------------------
 def prepare_features_train_val(
     df_train: pd.DataFrame,
     df_val: pd.DataFrame = None,
@@ -25,42 +77,15 @@ def prepare_features_train_val(
     threshold_skew=0.5,
     encode_energy=True,
 ):
-    """
-    Prepare train and optional validation features for modeling.
-
-    Handles:
-      - Numeric features (fillna, float conversion)
-      - Log-transforms
-      - Binary flags
-      - Extra numeric features (floor_level, lease_years_remaining, backyard, balcony)
-      - Energy label encoding
-      - Categorical OHE (aligned train/val)
-
-    Args:
-        df_train: Training dataframe (features only, target excluded)
-        df_val: Optional validation dataframe
-        numeric_features: List of numeric columns
-        binary_flags: List of binary flag columns
-        threshold_skew: Threshold for log-transform
-        encode_energy: Whether to encode energy label
-
-    Returns:
-        X_train: Transformed training features
-        X_val: Transformed validation features (or None)
-        meta: Metadata for transforming test set (medians, encoders, OHE columns)
-    """
     df_train = df_train.copy()
     df_val = df_val.copy() if df_val is not None else None
 
-    # -------------------
-    # Numeric features
-    # -------------------
+    # ------------------- Numeric -------------------
     if numeric_features is None:
         numeric_features = [
             "size_num",
             "contribution_vve_num",
             "external_storage_num",
-            # "living_area",
             "nr_rooms",
             "bathrooms",
             "toilets",
@@ -79,30 +104,29 @@ def prepare_features_train_val(
         if df_val is not None:
             df_val[col] = df_val[col].apply(to_float).fillna(median_val)
 
-    # -------------------
-    # Log-transform
-    # -------------------
+    # ------------------- Log-transform -------------------
     df_train, log_cols = auto_log_transform_train(
         df_train, numeric_features, threshold_skew
     )
     if df_val is not None:
         df_val = apply_log_transform(df_val, log_cols)
 
-    # -------------------
-    # Binary flags
-    # -------------------
+    # ------------------- Binary flags -------------------
     if binary_flags is None:
         binary_flags = [
             "has_mechanische_ventilatie",
             "has_tv_kabel",
             "has_lift",
             "has_natuurlijke_ventilatie",
-            # "has_n/a",
             "has_schuifpui",
             "has_glasvezelkabel",
             "has_frans_balkon",
             "has_buitenzonwering",
             "has_zonnepanelen",
+            "has_airconditioning",
+            "has_domotica",
+            "has_sauna",
+            "has_zwembad",
         ]
 
     for col in binary_flags:
@@ -110,9 +134,7 @@ def prepare_features_train_val(
         if df_val is not None:
             df_val[col] = df_val[col].fillna(0).astype(int)
 
-    # -------------------
-    # Extra numeric features
-    # -------------------
+    # ------------------- Extra numeric -------------------
     for df in [df_train] + ([df_val] if df_val is not None else []):
         df["floor_level"] = df["located_on"].apply(extract_floor)
         df["lease_years_remaining"] = (
@@ -123,9 +145,14 @@ def prepare_features_train_val(
             lambda x: 0 if pd.isna(x) or x == "N/A" else 1
         )
 
-    # -------------------
-    # Energy label
-    # -------------------
+    # ------------------- Luxury + Interactions -------------------
+    df_train = add_luxury_features(df_train)
+    df_train = add_luxury_interactions(df_train)
+    if df_val is not None:
+        df_val = add_luxury_features(df_val)
+        df_val = add_luxury_interactions(df_val)
+
+    # ------------------- Energy label -------------------
     if encode_energy:
         df_train, encoder_energy = encode_energy_label(
             df_train, column="energy_label", fit=True
@@ -140,9 +167,7 @@ def prepare_features_train_val(
     else:
         encoder_energy = None
 
-    # -------------------
-    # Categorical features
-    # -------------------
+    # ------------------- Categoricals -------------------
     if "postal_code_clean" in df_train.columns:
         df_train["postal_district"] = (
             df_train["postal_code_clean"].astype(str).str[:3]
@@ -162,7 +187,6 @@ def prepare_features_train_val(
     }
 
     ohe_train_list, ohe_val_list = [], []
-
     for col_name, series in cat_cols.items():
         ohe = pd.get_dummies(series, prefix=col_name, drop_first=True)
         ohe_train_list.append(ohe)
@@ -189,9 +213,7 @@ def prepare_features_train_val(
         else None
     )
 
-    # -------------------
-    # Combine features
-    # -------------------
+    # ------------------- Combine features -------------------
     model_features = (
         numeric_features
         + log_cols
@@ -202,6 +224,16 @@ def prepare_features_train_val(
             "backyard_num",
             "balcony_flag",
             "energy_label_encoded",
+            # Luxury
+            "luxury_score",
+            "num_luxury_facilities",
+            "has_high_end_facilities",
+            "luxury_density",
+            "size_per_luxury",
+            # Interactions
+            "luxury_x_price_m2",
+            "luxury_x_size",
+            "luxury_x_inhabitants",
         ]
     )
 
@@ -212,9 +244,7 @@ def prepare_features_train_val(
         else None
     )
 
-    # -------------------
-    # Feature expansion
-    # -------------------
+    # ------------------- Feature expansion -------------------
     pre_exp_cols = set(X_train.columns)
     X_train = feature_expansion(X_train)
     if X_val is not None:
@@ -241,24 +271,11 @@ def prepare_features_train_val(
     return X_train, X_val, meta
 
 
+# ------------------- Test -------------------
 def prepare_features_test(df_test: pd.DataFrame, meta: dict):
-    """
-    Apply the same transformations to test set as train/val.
-
-    Aligns numeric, log-transformed, binary, extra numeric, energy label, and OHE features.
-
-    Args:
-        df_test: Raw test features (target excluded)
-        meta: Metadata from prepare_features_train_val
-
-    Returns:
-        X_test_transformed: Fully transformed test features
-    """
     df_test = df_test.copy()
 
-    # -------------------
     # Numeric
-    # -------------------
     for col in meta["numeric_features"]:
         df_test[col] = (
             df_test[col]
@@ -269,7 +286,7 @@ def prepare_features_test(df_test: pd.DataFrame, meta: dict):
     # Log-transform
     df_test = apply_log_transform(df_test, meta["log_cols"])
 
-    # Binary flags
+    # Binary
     for col in meta["binary_flags"]:
         df_test[col] = df_test[col].fillna(0).astype(int)
 
@@ -283,13 +300,20 @@ def prepare_features_test(df_test: pd.DataFrame, meta: dict):
         lambda x: 0 if pd.isna(x) or x == "N/A" else 1
     )
 
-    # Energy label
+    # Luxury + Interactions
+    df_test = add_luxury_features(df_test)
+    df_test = add_luxury_interactions(df_test)
+
+    # Energy
     if meta["encoder_energy"] is not None:
         df_test, _ = encode_energy_label(
-            df_test, encoder=meta["encoder_energy"], fit=False
+            df_test,
+            column="energy_label",
+            encoder=meta["encoder_energy"],
+            fit=False,
         )
 
-    # Categorical OHE
+    # Categoricals
     cat_cols = {
         "postal_district": df_test["postal_code_clean"].astype(str).str[:3],
         "status": df_test["status"].fillna("N/A"),
@@ -311,6 +335,7 @@ def prepare_features_test(df_test: pd.DataFrame, meta: dict):
 
     ohe_concat = pd.concat(ohe_list, axis=1)
 
+    # Combine
     model_features = (
         meta["numeric_features"]
         + meta["log_cols"]
@@ -321,6 +346,16 @@ def prepare_features_test(df_test: pd.DataFrame, meta: dict):
             "backyard_num",
             "balcony_flag",
             "energy_label_encoded",
+            # Luxury
+            "luxury_score",
+            "num_luxury_facilities",
+            "has_high_end_facilities",
+            "luxury_density",
+            "size_per_luxury",
+            # Interactions
+            "luxury_x_price_m2",
+            "luxury_x_size",
+            "luxury_x_inhabitants",
         ]
     )
 
@@ -328,9 +363,7 @@ def prepare_features_test(df_test: pd.DataFrame, meta: dict):
         [df_test[model_features], ohe_concat], axis=1
     )
 
-    # -------------------
     # Feature expansion
-    # -------------------
     X_test_transformed = feature_expansion(X_test_transformed)
 
     # Ensure numeric/log columns are float

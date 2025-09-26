@@ -64,16 +64,27 @@ def select_and_clean(
     df_copy = df.copy()
     extra_cols = (
         [
+            # Location / property metadata
             "located_on",
             "ownership_type",
-            "backyard",
-            "balcony",
-            "energy_label",
             "postal_code_clean",
             "status",
             "roof_type",
             "location",
             "garden",
+            # Property amenities / features
+            "backyard",
+            "balcony",
+            "facilities",
+            "facilities_list",
+            "garden_location",
+            "num_parcels",
+            "parcels_concat",
+            # Extra binary / luxury features
+            "has_zwembad",
+            "has_verwarming",
+            "has_vliering",
+            "has_windmolen",
         ]
         if extended_fe
         else []
