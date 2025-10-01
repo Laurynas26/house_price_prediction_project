@@ -35,7 +35,8 @@ def unified_objective(
     feature engineering.
 
     Workflow:
-        1. Load model configuration and suggest hyperparameters via Optuna trial.
+        1. Load model configuration and suggest hyperparameters via Optuna 
+        trial.
         2. Prepare base dataset (features + target).
         3. Apply optional log-transform on the target variable.
         4. Perform K-Fold CV with fold-wise data preparation:
@@ -87,15 +88,6 @@ def unified_objective(
     # 2️⃣ Base data prep
     X_full, y_full = prepare_base_data(df, features_config, model_name)
 
-    # # 🔍 Debug: Print global columns
-    # print("\n===== Feature Columns (X) =====")
-    # print(list(X_full.columns))
-    # print(f"\nNumber of features: {len(X_full.columns)}")
-
-    # print("\n===== Target Column (y) =====")
-    # print(y_full.name)
-    # print(f"Number of target values: {len(y_full)}\n")
-
     # Optional log-transform on target
     target_transform = np.log1p if use_log else None
     inverse_transform = np.expm1 if use_log else None
@@ -114,12 +106,6 @@ def unified_objective(
             y_full.iloc[val_idx].copy(),
         )
 
-        # # 🔍 Debug: after raw split
-        # print(f"\n--- Fold {fold} (raw split) ---")
-        # print("X_train shape:", X_train.shape, "X_val shape:", X_val.shape)
-        # print("y_train size:", len(y_train), "y_val size:", len(y_val))
-        # print("All feature names:", list(X_train.columns))
-
         # Baseline: fold-wise encode only energy_label
         if not use_extended_features:
             if "energy_label" in X_train.columns:
@@ -135,24 +121,11 @@ def unified_objective(
             X_train = X_train.fillna(0)
             X_val = X_val.fillna(0)
 
-            # # 🔍 Debug: after baseline encoding
-            # print(f"[Fold {fold}] After baseline encoding:")
-            # print("X_train dtypes summary:\n", X_train.dtypes.value_counts())
-            # print("Any NaNs left?", X_train.isna().sum().sum())
-
         # Full features: fold-wise feature engineering
         else:
             X_train, X_val, meta, fold_encoders = prepare_fold_features(
                 X_train, X_val, use_extended_features=True
             )
-
-        #     # 🔍 Debug: after extended feature engineering
-        #     print(f"[Fold {fold}] After extended feature engineering:")
-        #     print("X_train shape:", X_train.shape, "X_val shape:", X_val.shape)
-        #     print("New features added:", meta.get("expanded_features", []))
-
-        # # 🔍 Debug: right before training
-        # print(f"[Fold {fold}] Final training matrix has {X_train.shape[1]} features")
 
         # 4️⃣ Initialize evaluator
         evaluator = ModelEvaluator(
