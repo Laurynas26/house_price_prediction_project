@@ -13,13 +13,15 @@ def prepare_base_data(
     extended_fe: bool = True,
 ):
     """
-    Prepare base feature set for CV folds with optional extra columns for extended feature engineering.
+    Prepare base feature set for CV folds with optional extra columns
+    for extended feature engineering.
 
     Args:
         df: Input dataframe
         features_config: Path to YAML config
         model_name: Model name in YAML
-        extended_fe: Whether to include extra columns needed for fold-wise feature engineering
+        extended_fe: Whether to include extra columns needed
+        for fold-wise feature engineering
 
     Returns:
         X_full (pd.DataFrame): Feature dataframe

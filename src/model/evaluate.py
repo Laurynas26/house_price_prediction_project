@@ -79,8 +79,6 @@ class ModelEvaluator:
         y_val_trans = (
             self._apply_transform(y_val) if y_val is not None else None
         )
-        y_test_trans = self._apply_transform(y_test)
-
         if use_xgb_train:
             if X_val is None or y_val is None:
                 raise ValueError(

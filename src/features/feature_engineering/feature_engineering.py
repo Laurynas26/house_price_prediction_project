@@ -1,5 +1,4 @@
 import pandas as pd
-import numpy as np
 from .utils import (
     to_float,
     extract_floor,
@@ -50,7 +49,8 @@ def add_luxury_features(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def add_luxury_interactions(df: pd.DataFrame) -> pd.DataFrame:
-    """Create domain-specific interactions between luxury features and neighborhood/size metrics."""
+    """Create domain-specific interactions between luxury features 
+    and neighborhood/size metrics."""
     df = df.copy()
     if "luxury_score" not in df.columns:
         raise ValueError(

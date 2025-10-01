@@ -12,7 +12,8 @@ def to_float(value):
 
 
 def extract_floor(x):
-    """Extract floor number from string like '3e verdieping', safely handling non-scalars."""
+    """Extract floor number from string like '3e verdieping',
+    safely handling non-scalars."""
     # If x is a Series, list, or array, take the first element
     if isinstance(x, (pd.Series, list, np.ndarray)):
         if len(x) > 0:
@@ -53,7 +54,8 @@ def drop_low_variance_dummies(df, threshold=0.95):
 
 
 def auto_log_transform_train(df_train, numeric_cols, threshold_skew=0.5):
-    """Compute which columns to log-transform on training fold and return fitted info."""
+    """Compute which columns to log-transform on training fold
+    and return fitted info."""
     log_cols = []
     for col in numeric_cols:
         if (df_train[col] > 0).all():
