@@ -23,7 +23,8 @@ SCALERS = {
 
 def load_features_config(config_path: str, model_name: str):
     """
-    Load features, target, split, and scaling configuration for a model from YAML.
+    Load features, target, split, and scaling configuration for a model
+    from YAML.
 
     Returns:
         features (list): Feature column names.
@@ -52,10 +53,11 @@ def select_and_clean(
     Select relevant columns and clean missing values.
 
     Args:
-        df: Input dataframe
-        features: List of features
-        target: Target column name
-        extended_fe: Whether to include extra columns for extended feature engineering
+        df: Input dataframe.
+        features: List of features.
+        target: Target column name.
+        extended_fe: Whether to include extra columns for extended feature
+        engineering.
 
     Returns:
         X (pd.DataFrame): Feature DataFrame
@@ -151,7 +153,8 @@ def prepare_data(
     cv: bool = False,
 ):
     """
-    Full data preparation pipeline: split, feature engineering, energy encoding, and scaling.
+    Full data preparation pipeline: split, feature engineering, energy encoding,
+    and scaling.
 
     Args:
         df: Raw dataset
