@@ -21,7 +21,8 @@ def load_data_from_json(path_pattern: str) -> pd.DataFrame:
     Notes
     -----
     - Assumes each JSON file contains a dictionary-like structure.
-    - If JSON files contain nested structures, further normalization may be required.
+    - If JSON files contain nested structures, further normalization may be
+    required.
     - Files are read using UTF-8 encoding.
     """
     files = glob.glob(path_pattern)
