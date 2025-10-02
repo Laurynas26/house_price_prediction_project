@@ -11,3 +11,16 @@ preprocessing:
     external_storage_num: constant:0
     year_of_construction: median
     contribution_vve_num: constant:0
+
+geo_feature_exp:
+  geo_cache_file: "data/df_with_lat_lon_encoded.csv"
+  amenities_file: "data/amsterdam_amenities.csv"
+  amenity_radius_map:
+    school: [0.5, 1.0]
+    park: [0.5, 1.0]
+    supermarket: [0.5, 1.0]
+    hospital: [1.0, 2.0]
+    bus_stop: [0.5, 1.0]
+    tram_stop: [0.5, 1.0]
+    metro_stop: [0.5, 1.0]
+    light_rail_stop: [0.5, 1.0]
