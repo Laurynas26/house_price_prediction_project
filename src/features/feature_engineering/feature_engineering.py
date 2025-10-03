@@ -14,6 +14,8 @@ from .encoding import encode_energy_label
 from src.features.feature_engineering.feature_expansion import (
     feature_expansion,
 )
+from typing import Optional
+
 
 # ------------------- Luxury Amenities -------------------
 LUXURY_AMENITIES = [
@@ -34,7 +36,6 @@ LUXURY_AMENITIES_WEIGHTS = {
 
 
 def add_luxury_features(df: pd.DataFrame) -> pd.DataFrame:
-    """Derive luxury-related features."""
     df = df.copy()
     df["luxury_score"] = sum(
         df[col] * w for col, w in LUXURY_AMENITIES_WEIGHTS.items()
@@ -49,8 +50,6 @@ def add_luxury_features(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def add_luxury_interactions(df: pd.DataFrame) -> pd.DataFrame:
-    """Create domain-specific interactions between luxury features 
-    and neighborhood/size metrics."""
     df = df.copy()
     if "luxury_score" not in df.columns:
         raise ValueError(
@@ -76,6 +75,15 @@ def prepare_features_train_val(
     binary_flags=None,
     threshold_skew=0.5,
     encode_energy=True,
+    use_geolocation=False,
+    geo_meta=None,
+    geo_cache_file=None,
+    use_amenities=False,
+    amenities_df=None,
+    amenity_radius_map=None,
+    amenity_meta=None,
+    fit=True,
+    enable_cache_save=False,
 ):
     df_train = df_train.copy()
     df_val = df_val.copy() if df_val is not None else None
@@ -135,13 +143,13 @@ def prepare_features_train_val(
             df_val[col] = df_val[col].fillna(0).astype(int)
 
     # ------------------- Extra numeric -------------------
-    for df in [df_train] + ([df_val] if df_val is not None else []):
-        df["floor_level"] = df["located_on"].apply(extract_floor)
-        df["lease_years_remaining"] = (
-            df["ownership_type"].apply(extract_lease_years).fillna(0)
+    for df_ in [df_train] + ([df_val] if df_val is not None else []):
+        df_["floor_level"] = df_["located_on"].apply(extract_floor)
+        df_["lease_years_remaining"] = (
+            df_["ownership_type"].apply(extract_lease_years).fillna(0)
         )
-        df["backyard_num"] = df["backyard"].apply(to_float).fillna(0)
-        df["balcony_flag"] = df["balcony"].apply(
+        df_["backyard_num"] = df_["backyard"].apply(to_float).fillna(0)
+        df_["balcony_flag"] = df_["balcony"].apply(
             lambda x: 0 if pd.isna(x) or x == "N/A" else 1
         )
 
@@ -214,6 +222,7 @@ def prepare_features_train_val(
     )
 
     # ------------------- Combine features -------------------
+    preserve_cols = ["address", "postal_code_clean"] if use_geolocation else []
     model_features = (
         numeric_features
         + log_cols
@@ -237,18 +246,44 @@ def prepare_features_train_val(
         ]
     )
 
-    X_train = pd.concat([df_train[model_features], ohe_train_reduced], axis=1)
+    X_train = pd.concat(
+        [df_train[model_features + preserve_cols], ohe_train_reduced], axis=1
+    )
     X_val = (
-        pd.concat([df_val[model_features], ohe_val_reduced], axis=1)
+        pd.concat(
+            [df_val[model_features + preserve_cols], ohe_val_reduced], axis=1
+        )
         if df_val is not None
         else None
     )
 
     # ------------------- Feature expansion -------------------
     pre_exp_cols = set(X_train.columns)
-    X_train = feature_expansion(X_train)
+    X_train, geo_meta_out, amenity_meta_out = feature_expansion(
+        X_train,
+        use_geolocation=use_geolocation,
+        geo_meta=geo_meta,
+        geo_cache_file=geo_cache_file,
+        use_amenities=use_amenities,
+        amenities_df=amenities_df,
+        amenity_radius_map=amenity_radius_map,
+        amenity_meta=amenity_meta,
+        fit=fit,
+        enable_cache_save=enable_cache_save
+    )
     if X_val is not None:
-        X_val = feature_expansion(X_val)
+        X_val, _, _ = feature_expansion(
+            X_val,
+            use_geolocation=use_geolocation,
+            geo_meta=geo_meta_out,
+            geo_cache_file=geo_cache_file,
+            use_amenities=use_amenities,
+            amenities_df=amenities_df,
+            amenity_radius_map=amenity_radius_map,
+            amenity_meta=amenity_meta_out,
+            fit=False,
+            enable_cache_save=enable_cache_save,
+        )
     expanded_features = list(set(X_train.columns) - pre_exp_cols)
 
     # Ensure numeric/log columns are float
@@ -266,16 +301,45 @@ def prepare_features_train_val(
         "binary_flags": binary_flags,
         "train_medians": train_medians,
         "expanded_features": expanded_features,
+        "geo_meta": geo_meta_out,
+        "amenity_meta": amenity_meta_out,
+        "geo_cache_file": geo_cache_file,
     }
 
     return X_train, X_val, meta
 
 
 # ------------------- Test -------------------
-def prepare_features_test(df_test: pd.DataFrame, meta: dict):
+def prepare_features_test(
+    df_test: pd.DataFrame,
+    meta: dict,
+    use_geolocation: bool = False,
+    use_amenities: bool = False,
+    amenities_df: pd.DataFrame = None,
+    amenity_radius_map: dict = None,
+    geo_cache_file: str = None,
+    enable_cache_save: bool = False,
+):
+    """
+    Prepare test features for modeling, including numeric/log transforms, binary flags,
+    luxury features, energy label encoding, categorical OHE, and optional feature expansion
+    with geolocation or amenities.
+
+    Args:
+        df_test (pd.DataFrame): Raw test dataframe.
+        meta (dict): Metadata from training/validation pipeline including medians,
+                     log columns, OHE columns, numeric/binary features, and geolocation/amenity metadata.
+        use_geolocation (bool): If True, compute distance-based features.
+        use_amenities (bool): If True, compute proximity to amenities features.
+        amenities_df (pd.DataFrame): Optional amenities dataset for test set.
+        amenity_radius_map (dict): Optional radius mapping for amenity features.
+
+    Returns:
+        pd.DataFrame: Transformed test dataframe ready for modeling.
+    """
     df_test = df_test.copy()
 
-    # Numeric
+    # ------------------- Numeric -------------------
     for col in meta["numeric_features"]:
         df_test[col] = (
             df_test[col]
@@ -283,14 +347,14 @@ def prepare_features_test(df_test: pd.DataFrame, meta: dict):
             .fillna(meta["train_medians"].get(col, 0))
         )
 
-    # Log-transform
+    # ------------------- Log-transform -------------------
     df_test = apply_log_transform(df_test, meta["log_cols"])
 
-    # Binary
+    # ------------------- Binary flags -------------------
     for col in meta["binary_flags"]:
         df_test[col] = df_test[col].fillna(0).astype(int)
 
-    # Extra numeric
+    # ------------------- Extra numeric -------------------
     df_test["floor_level"] = df_test["located_on"].apply(extract_floor)
     df_test["lease_years_remaining"] = (
         df_test["ownership_type"].apply(extract_lease_years).fillna(0)
@@ -300,12 +364,12 @@ def prepare_features_test(df_test: pd.DataFrame, meta: dict):
         lambda x: 0 if pd.isna(x) or x == "N/A" else 1
     )
 
-    # Luxury + Interactions
+    # ------------------- Luxury + Interactions -------------------
     df_test = add_luxury_features(df_test)
     df_test = add_luxury_interactions(df_test)
 
-    # Energy
-    if meta["encoder_energy"] is not None:
+    # ------------------- Energy label -------------------
+    if meta.get("encoder_energy") is not None:
         df_test, _ = encode_energy_label(
             df_test,
             column="energy_label",
@@ -313,7 +377,7 @@ def prepare_features_test(df_test: pd.DataFrame, meta: dict):
             fit=False,
         )
 
-    # Categoricals
+    # ------------------- Categoricals -------------------
     cat_cols = {
         "postal_district": df_test["postal_code_clean"].astype(str).str[:3],
         "status": df_test["status"].fillna("N/A"),
@@ -335,7 +399,15 @@ def prepare_features_test(df_test: pd.DataFrame, meta: dict):
 
     ohe_concat = pd.concat(ohe_list, axis=1)
 
-    # Combine
+    # ------------------- Preserve columns for geolocation -------------------
+    preserve_cols = ["address", "postal_code_clean"] if use_geolocation else []
+    for col in preserve_cols:
+        if col not in df_test.columns:
+            raise ValueError(
+                f"Column '{col}' is required for geolocation but missing in test dataframe."
+            )
+
+    # ------------------- Combine features -------------------
     model_features = (
         meta["numeric_features"]
         + meta["log_cols"]
@@ -360,11 +432,22 @@ def prepare_features_test(df_test: pd.DataFrame, meta: dict):
     )
 
     X_test_transformed = pd.concat(
-        [df_test[model_features], ohe_concat], axis=1
+        [df_test[model_features + preserve_cols], ohe_concat], axis=1
     )
 
-    # Feature expansion
-    X_test_transformed = feature_expansion(X_test_transformed)
+    # ------------------- Feature expansion -------------------
+    X_test_transformed, _, _ = feature_expansion(
+        X_test_transformed,
+        use_geolocation=use_geolocation,
+        geo_meta=meta.get("geo_meta"),
+        geo_cache_file=geo_cache_file,
+        use_amenities=use_amenities,
+        amenities_df=amenities_df,
+        amenity_radius_map=amenity_radius_map,
+        amenity_meta=meta.get("amenity_meta"),
+        fit=False,
+        enable_cache_save=enable_cache_save,
+    )
 
     # Ensure numeric/log columns are float
     for col in meta["numeric_features"] + meta["log_cols"]:
