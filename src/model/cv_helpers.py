@@ -3,6 +3,7 @@ import numpy as np
 from src.features.feature_engineering import feature_engineering_cv as fe_cv
 from src.features.data_prep_for_modelling.data_preparation import (
     load_features_config,
+    load_geo_config,  # <-- 👈 add here
 )
 
 
@@ -12,23 +13,7 @@ def prepare_base_data(
     model_name: str,
     extended_fe: bool = True,
 ):
-    """
-    Prepare base feature set for CV folds with optional extra columns
-    for extended feature engineering.
-
-    Args:
-        df: Input dataframe
-        features_config: Path to YAML config
-        model_name: Model name in YAML
-        extended_fe: Whether to include extra columns needed
-        for fold-wise feature engineering
-
-    Returns:
-        X_full (pd.DataFrame): Feature dataframe
-        y_full (pd.Series): Target
-    """
     features, target, _, _ = load_features_config(features_config, model_name)
-
     df_copy = df.copy()
 
     extra_cols = (
@@ -42,6 +27,7 @@ def prepare_base_data(
             "has_verwarming",
             "has_vliering",
             "has_windmolen",
+            "address",
         ]
         if extended_fe
         else []
@@ -63,15 +49,45 @@ def prepare_base_data(
 def prepare_fold_features(
     X_train: pd.DataFrame,
     X_val: pd.DataFrame = None,
+    features_config: str = None,
     use_extended_features: bool = True,
+    enable_cache_save: bool = False,
 ):
     """
     CV-safe fold-wise feature engineering wrapper.
 
-    Delegates to feature_engineering_cv.prepare_fold_features
-    to avoid recursion and double encoding.
+    Loads geo/amenities config from YAML if extended features are enabled.
+    Drops 'address' column after geolocation enrichment to avoid leaking
+    location info into the model.
 
     Returns:
         X_train_fe, X_val_fe, meta, fold_encoders
     """
-    return fe_cv.prepare_fold_features(X_train, X_val, use_extended_features)
+    if use_extended_features and features_config is not None:
+        geo_cache_file, amenities_df, amenity_radius_map = load_geo_config(
+            features_config
+        )
+    else:
+        geo_cache_file, amenities_df, amenity_radius_map = None, None, None
+
+    X_train_fe, X_val_fe, meta, fold_encoders = fe_cv.prepare_fold_features(
+        X_train,
+        X_val,
+        use_extended_features=use_extended_features,
+        include_distance=True,
+        include_amenities=(
+            amenities_df is not None and amenity_radius_map is not None
+        ),
+        amenities_df=amenities_df,
+        amenity_radius_map=amenity_radius_map,
+        geo_cache_file=geo_cache_file,
+        enable_cache_save=enable_cache_save,
+    )
+
+    # Drop 'address' if present
+    for df in [X_train_fe, X_val_fe]:
+        if df is not None and "address" in df.columns:
+            df.drop(columns=["address"], inplace=True)
+
+    return X_train_fe, X_val_fe, meta, fold_encoders
+
