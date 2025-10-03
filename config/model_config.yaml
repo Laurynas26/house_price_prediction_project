@@ -507,6 +507,7 @@ xgboost_early_stopping_optuna_feature_eng_geoloc_exp:
     - roof_type
     - location
     - garden
+    - address
   target: price_num
   train_test_split:
     test_size: 0.2
@@ -529,38 +530,37 @@ xgboost_early_stopping_optuna_feature_eng_geoloc_exp:
       high: 6
     min_child_weight:
       type: int
-      low: 7
-      high: 10         
+      low: 5
+      high: 8
     eta:
       type: float
-      low: 0.12
+      low: 0.1
       high: 0.18
       log: false
     subsample:
       type: float
-      low: 0.75
-      high: 0.9        # Reasonable range to prevent overfitting
+      low: 0.7
+      high: 0.90
     colsample_bytree:
       type: float
-      low: 0.7
-      high: 0.8       # Slightly reduced upper bound to stabilize trees
+      low: 0.69
+      high: 0.8
     gamma:
       type: float
-      low: 0.0
-      high: 0.1        # Regularization to prune splits
+      low: 0.1
+      high: 0.15
     lambda:
       type: float
-      low: 0.03       # >0 for log scale
-      high: 0.1
+      low: 0.06
+      high: 0.15
     alpha:
       type: float
-      low: 0.04        # >0 for log scale
-      high: 0.12
+      low: 0.14
+      high: 0.2
     max_bin:
       type: int
-      low: 250
-      high: 300        # Smaller bins can improve split precision
-
+      low: 200
+      high: 300   # Smaller bins can improve split precision
 
 random_forest_optuna_feature_eng:
   features:

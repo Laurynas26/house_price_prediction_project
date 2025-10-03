@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import OrdinalEncoder
+from typing import Optional
+
 from .encoding import encode_train_val_only
 from .utils import extract_floor, extract_lease_years, to_float
 from src.features.feature_engineering.feature_expansion import (
@@ -126,37 +128,27 @@ def prepare_fold_features(
     threshold_skew=0.5,
     encode_energy=True,
     use_extended_features=True,
+    include_distance=True,
+    include_amenities=True,
+    amenities_df: Optional[pd.DataFrame] = None,
+    amenity_radius_map: Optional[dict] = None,
+    geo_cache_file: Optional[str] = None,
+    enable_cache_save: bool = False,
 ):
     """
-    Fold-wise feature prep (CV) mimicking the non-CV pipeline.
-    - Numeric: fillna, optional log-transform
-    - Binary flags
-    - Extra numeric features
-    - Energy label encoding
-    - Categorical simplification + OHE
-    - Low-variance dummy drop
-    - Optional safe feature expansion
+    Fold-wise feature prep (CV) compatible with extended geo/amenity features.
+    Handles:
+      - Numeric processing + log-transform
+      - Binary flags
+      - Extra numeric features
+      - Energy label encoding
+      - Categorical simplification + OHE
+      - Low-variance dummy drop
+      - Luxury features/interactions
+      - Optional geo/amenity feature expansion
 
-    Parameters
-    ----------
-    X_train : pd.DataFrame
-        Training dataframe for the current fold.
-    X_val : pd.DataFrame, optional
-        Validation dataframe for the current fold. Default is None.
-    use_extended_features : bool, default=True
-        If False, skip generating extended numeric and categorical features.
-
-    Returns
-    -------
-    X_train_final : pd.DataFrame
-        Transformed training set with numeric, binary, extended, and encoded features.
-    X_val_final : pd.DataFrame or None
-        Transformed validation set (if provided), otherwise None.
-    meta : dict
-        Metadata including numeric columns, training medians, binary flags,
-        extra numeric columns, OHE columns, energy label encoder, and expanded features.
-    fold_encoders : dict
-        Dictionary of fitted encoders used in this fold (e.g., for energy label).
+    Returns:
+      X_train_final, X_val_final, meta dict, fold_encoders
     """
     X_train = X_train.copy()
     X_val = X_val.copy() if X_val is not None else None
@@ -259,7 +251,6 @@ def prepare_fold_features(
     meta["encoder_energy"] = encoder_energy
 
     # ---------------- Categorical Features ----------------
-    # Postal district simplification
     X_train["postal_district"] = (
         X_train["postal_code_clean"].astype(str).str[:3]
     )
@@ -286,7 +277,6 @@ def prepare_fold_features(
             val_ohe = pd.get_dummies(
                 val_series, prefix=col_name, drop_first=True
             )
-            # Align with training
             for c in ohe.columns:
                 if c not in val_ohe:
                     val_ohe[c] = 0
@@ -306,7 +296,7 @@ def prepare_fold_features(
     meta["ohe_columns"] = ohe_train_reduced.columns.tolist()
     meta["dropped_ohe_columns"] = dropped_cols
 
-    # ---------------- Luxury Features + Interactions ----------------
+    # ---------------- Luxury Features ----------------
     X_train = add_luxury_features(X_train)
     X_train = add_luxury_interactions(X_train)
     if X_val is not None:
@@ -341,15 +331,55 @@ def prepare_fold_features(
             [X_val[model_features], ohe_val_reduced], axis=1
         )
 
+    if include_distance:
+        for df_, orig_df_ in [(X_train_final, X_train), (X_val_final, X_val)]:
+            if df_ is not None and "address" not in df_.columns and "address" in orig_df_.columns:
+                addr = orig_df_["address"]
+
+                # If it's a DataFrame with duplicate columns, collapse to Series
+                if isinstance(addr, pd.DataFrame):
+                    addr = addr.iloc[:, 0]
+
+                # Now it's guaranteed to be a Series
+                df_["address"] = addr
+
     # ---------------- Feature Expansion ----------------
     if use_extended_features:
         pre_exp_cols = set(X_train_final.columns)
-        X_train_final = feature_expansion(X_train_final)
+
+        # Apply the new geo/amenity expansion (unpack tuple)
+        X_train_final, geo_meta_out, amenity_meta_out = feature_expansion(
+            X_train_final,
+            use_geolocation=include_distance,
+            geo_meta=meta.get("geo_meta"),
+            use_amenities=include_amenities,
+            amenities_df=amenities_df,
+            amenity_radius_map=amenity_radius_map,
+            amenity_meta=meta.get("amenity_meta"),
+            fit=True,
+            geo_cache_file=geo_cache_file,
+            enable_cache_save=enable_cache_save,
+        )
+
         if X_val_final is not None:
-            X_val_final = feature_expansion(X_val_final)
+            X_val_final, _, _ = feature_expansion(
+                X_val_final,
+                use_geolocation=include_distance,
+                geo_meta=geo_meta_out,
+                use_amenities=include_amenities,
+                amenities_df=amenities_df,
+                amenity_radius_map=amenity_radius_map,
+                amenity_meta=amenity_meta_out,
+                fit=False,
+                geo_cache_file=geo_cache_file,
+                enable_cache_save=enable_cache_save,
+            )
+
         meta["expanded_features"] = list(
             set(X_train_final.columns) - pre_exp_cols
         )
+        meta["geo_meta"] = geo_meta_out
+        meta["amenity_meta"] = amenity_meta_out
     else:
         meta["expanded_features"] = []
 

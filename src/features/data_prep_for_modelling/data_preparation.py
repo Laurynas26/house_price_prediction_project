@@ -1,8 +1,11 @@
 import yaml
 import numpy as np
 import pandas as pd
+from pathlib import Path
+from typing import Optional
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
+
 from src.features.feature_engineering.feature_engineering import (
     prepare_features_train_val,
     prepare_features_test,
@@ -21,17 +24,69 @@ SCALERS = {
 }
 
 
-def load_features_config(config_path: str, model_name: str):
-    """
-    Load features, target, split, and scaling configuration for a model
-    from YAML.
+def load_geo_config(config_path: Path):
+    config_path = Path(config_path).resolve()
+    if not config_path.exists():
+        raise FileNotFoundError(f"Config file not found: {config_path}")
 
-    Returns:
-        features (list): Feature column names.
-        target (str): Target column name.
-        split_cfg (dict): Train/test split configuration.
-        scaling_cfg (dict): Scaling configuration.
-    """
+    cfg = yaml.safe_load(open(config_path))
+    geo_cfg = cfg.get("geo_feature_exp", {})
+
+    geo_cache_file_name = geo_cfg.get("geo_cache_file")
+    if geo_cache_file_name is None:
+        raise ValueError("geo_cache_file not defined in YAML")
+    geo_cache_file_path = (config_path.parent / geo_cache_file_name).resolve()
+    if not geo_cache_file_path.exists():
+        raise FileNotFoundError(
+            f"Geo cache file not found: {geo_cache_file_path}"
+        )
+
+    amenities_file_name = geo_cfg.get("amenities_file")
+    amenities_file_path = (
+        (config_path.parent / amenities_file_name).resolve()
+        if amenities_file_name
+        else None
+    )
+    amenities_df = (
+        pd.read_csv(amenities_file_path)
+        if amenities_file_path and amenities_file_path.exists()
+        else None
+    )
+
+    amenity_radius_map = geo_cfg.get("amenity_radius_map", None)
+
+    return str(geo_cache_file_path), amenities_df, amenity_radius_map
+
+
+def prepare_data_from_config(df, config_path, model_name, geo_cache_file=None, enable_cache_save=False):
+    geo_cache_file_from_config, amenities_df, amenity_radius_map = (
+        load_geo_config(config_path)
+    )
+    if geo_cache_file is None:
+        geo_cache_file = geo_cache_file_from_config
+
+    if geo_cache_file is None:
+        raise FileNotFoundError(
+            "Geo cache file not found! Check your YAML config or provide geo_cache_file explicitly."
+        )
+
+    return prepare_data(
+        df=df,
+        config_path=str(config_path),
+        model_name=model_name,
+        use_extended_features=True,
+        include_distance=True,
+        include_amenities=(
+            amenities_df is not None and amenity_radius_map is not None
+        ),
+        amenities_df=amenities_df,
+        amenity_radius_map=amenity_radius_map,
+        geo_cache_file=str(geo_cache_file),
+        enable_cache_save=enable_cache_save
+    )
+
+
+def load_features_config(config_path: str, model_name: str):
     with open(config_path) as f:
         cfg = yaml.safe_load(f)
     model_cfg = cfg[model_name]
@@ -49,24 +104,9 @@ def load_features_config(config_path: str, model_name: str):
 def select_and_clean(
     df: pd.DataFrame, features: list, target: str, extended_fe: bool = False
 ):
-    """
-    Select relevant columns and clean missing values.
-
-    Args:
-        df: Input dataframe.
-        features: List of features.
-        target: Target column name.
-        extended_fe: Whether to include extra columns for extended feature
-        engineering.
-
-    Returns:
-        X (pd.DataFrame): Feature DataFrame
-        y (pd.Series): Target series
-    """
     df_copy = df.copy()
     extra_cols = (
         [
-            # Location / property metadata
             "located_on",
             "ownership_type",
             "postal_code_clean",
@@ -74,7 +114,6 @@ def select_and_clean(
             "roof_type",
             "location",
             "garden",
-            # Property amenities / features
             "backyard",
             "balcony",
             "facilities",
@@ -82,18 +121,22 @@ def select_and_clean(
             "garden_location",
             "num_parcels",
             "parcels_concat",
-            # Extra binary / luxury features
             "has_zwembad",
             "has_verwarming",
             "has_vliering",
             "has_windmolen",
+            "address",
         ]
         if extended_fe
         else []
     )
 
     cols_to_keep = list(set(features + extra_cols))
-    X = df_copy[cols_to_keep].replace("N/A", np.nan).fillna(0)
+    X = df_copy[cols_to_keep].copy()
+
+    numeric_cols = X.select_dtypes(include=[np.number]).columns
+    X[numeric_cols] = X[numeric_cols].replace("N/A", np.nan).fillna(0)
+
     y = df_copy[target]
     return X, y
 
@@ -101,12 +144,6 @@ def select_and_clean(
 def split_train_val_test_data(
     X, y, test_size=0.2, val_size=0.1, random_state=42, val_required=False
 ):
-    """
-    Split features and target into train/val/test sets.
-
-    Returns:
-        X_train, X_val, X_test, y_train, y_val, y_test
-    """
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=test_size, random_state=random_state
     )
@@ -123,9 +160,6 @@ def split_train_val_test_data(
 
 
 def scale_data(X_train, X_test, X_val=None, scaler_cls=StandardScaler):
-    """
-    Scale numeric + OHE features using specified scaler.
-    """
     scaler = scaler_cls()
     X_train_scaled = pd.DataFrame(
         scaler.fit_transform(X_train),
@@ -150,33 +184,21 @@ def prepare_data(
     config_path: str,
     model_name: str,
     use_extended_features: bool = False,
+    include_distance: bool = False,
+    include_amenities: bool = False,
+    amenities_df: Optional[pd.DataFrame] = None,
+    amenity_radius_map: Optional[dict] = None,
+    geo_cache_file: Optional[str] = None,
     cv: bool = False,
+    enable_cache_save: bool = False,
 ):
-    """
-    Full data preparation pipeline: split, feature engineering, energy encoding,
-    and scaling.
-
-    Args:
-        df: Raw dataset
-        config_path: Path to YAML config
-        model_name: Model name
-        use_extended_features: Apply extended feature engineering if True
-        cv: Skip test prep if True (cross-validation mode)
-
-    Returns:
-        X_train, X_test, y_train, y_test, X_val, y_val, scaler, meta
-    """
-    # --- Load config ---
     features, target, split_cfg, scaling_cfg = load_features_config(
         config_path, model_name
     )
-
-    # --- Select and clean columns ---
     X, y = select_and_clean(
         df, features, target, extended_fe=use_extended_features
     )
 
-    # --- Split data ---
     val_required = split_cfg.get("val_required", False)
     val_size = split_cfg.get("val_size", 0.1)
     split_result = split_train_val_test_data(
@@ -187,49 +209,97 @@ def prepare_data(
         val_required=val_required,
         val_size=val_size,
     )
-
     if val_required:
         X_train, X_val, X_test, y_train, y_val, y_test = split_result
     else:
         X_train, X_test, y_train, y_test = split_result
         X_val, y_val = None, None
 
-    meta = {}
-    fe_encoders = {}
+    meta, fe_encoders = {}, {}
 
-    # --- Extended feature engineering ---
     if use_extended_features:
-        # Train/val features only; target not included in FE
-        X_train, X_val, meta = prepare_features_train_val(X_train, X_val)
+        # Train/val feature engineering
+        X_train, X_val, meta = prepare_features_train_val(
+            X_train,
+            X_val,
+            use_geolocation=include_distance,
+            geo_cache_file=geo_cache_file,
+            use_amenities=include_amenities,
+            amenities_df=amenities_df,
+            amenity_radius_map=amenity_radius_map,
+        )
 
-        X_train = feature_expansion(X_train)
+        # Feature expansion
+        pre_exp_cols = set(X_train.columns)
+        X_train, geo_meta_out, amenity_meta_out = feature_expansion(
+            X_train,
+            use_geolocation=include_distance,
+            geo_meta=meta.get("geo_meta"),
+            use_amenities=include_amenities,
+            amenities_df=amenities_df,
+            amenity_radius_map=amenity_radius_map,
+            amenity_meta=meta.get("amenity_meta"),
+            fit=True,
+            geo_cache_file=geo_cache_file,
+            enable_cache_save=enable_cache_save,
+        )
+
         if X_val is not None:
-            X_val = feature_expansion(X_val)
+            X_val, _, _ = feature_expansion(
+                X_val,
+                use_geolocation=include_distance,
+                geo_meta=geo_meta_out,
+                use_amenities=include_amenities,
+                amenities_df=amenities_df,
+                amenity_radius_map=amenity_radius_map,
+                amenity_meta=amenity_meta_out,
+                fit=False,
+                geo_cache_file=geo_cache_file,
+                enable_cache_save=enable_cache_save
+            )
 
-        # Test features
+        meta["expanded_features"] = list(set(X_train.columns) - pre_exp_cols)
+        meta["geo_meta"] = geo_meta_out
+        meta["amenity_meta"] = amenity_meta_out
+
         if not cv and X_test is not None:
-            X_test = prepare_features_test(X_test, meta)
-            X_test = feature_expansion(X_test)
+            test_geo_cache_file = geo_cache_file
+            if (
+                test_geo_cache_file is None
+                and meta.get("geo_cache_file") is not None
+            ):
+                test_geo_cache_file = meta["geo_cache_file"]
 
-    # --- Energy label encoding for non-extended pipeline ---
+            X_test = prepare_features_test(
+                X_test,
+                meta,
+                use_geolocation=include_distance,
+                use_amenities=include_amenities,
+                amenities_df=amenities_df,
+                amenity_radius_map=amenity_radius_map,
+                geo_cache_file=test_geo_cache_file,
+            )
+
+        # --- DROP 'address' ONLY AFTER ALL FEATURE ENGINEERING ---
+        for df_ in [X_train, X_val, X_test]:
+            if df_ is not None and "address" in df_.columns:
+                df_.drop(columns="address", inplace=True)
+
     if not cv and not use_extended_features:
         X_train, X_test, X_val, energy_enc = (
             encode_energy_labels_train_test_val(X_train, X_test, X_val)
         )
         fe_encoders["energy_label"] = energy_enc
 
-    # --- Ensure numeric columns are float for XGBoost ---
+    # Ensure numeric/log columns are float
     numeric_cols = meta.get("numeric_features", [])
     log_cols = meta.get("log_cols", [])
     for col in numeric_cols + log_cols:
-        if col in X_train.columns:
-            X_train[col] = X_train[col].astype(float)
-        if X_val is not None and col in X_val.columns:
-            X_val[col] = X_val[col].astype(float)
-        if X_test is not None and col in X_test.columns:
-            X_test[col] = X_test[col].astype(float)
+        for df_ in [X_train, X_val, X_test]:
+            if df_ is not None and col in df_.columns:
+                df_[col] = df_[col].astype(float)
 
-    # --- Scaling ---
+    # Scaling
     if scaling_cfg.get("scale", True):
         scaler_cls = SCALERS.get(
             scaling_cfg.get("method", "StandardScaler"), StandardScaler
