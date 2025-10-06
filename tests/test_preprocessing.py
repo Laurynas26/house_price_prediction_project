@@ -59,6 +59,7 @@ def test_preprocess_df_basic():
         }
     ]
     df = pd.DataFrame(data)
+    df = df.drop(columns="has_n/a", errors="ignore")
     cleaned_df = preprocess_df(df)
 
     # Check if price_num and size_num are parsed correctly
