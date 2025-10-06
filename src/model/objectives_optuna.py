@@ -23,7 +23,7 @@ def unified_objective(
     use_extended_features: bool = True,
     use_geo_amenities: bool = True,  # 👈 toggle added here
     n_splits: int = 3,
-    enable_cache_save: bool = False
+    enable_cache_save: bool = False,
 ) -> float:
     """
     Objective function for Optuna hyperparameter optimization with leakage-safe
@@ -34,7 +34,8 @@ def unified_objective(
     use_extended_features : bool
         If True, perform extended fold-wise feature engineering.
     use_geo_amenities : bool
-        If True, load geo/amenities from YAML and include them in feature expansion.
+        If True, load geo/amenities from YAML and include them in
+        feature expansion.
     """
 
     # 1️⃣ Load model config and suggest trial parameters
@@ -89,7 +90,7 @@ def unified_objective(
                     X_val,
                     features_config=features_config,  # 👈 YAML-based configs
                     use_extended_features=True,
-                    enable_cache_save=enable_cache_save
+                    enable_cache_save=enable_cache_save,
                 )
                 if use_geo_amenities
                 else prepare_fold_features(
@@ -97,7 +98,7 @@ def unified_objective(
                     X_val,
                     features_config=None,  # 👈 no geo config loaded
                     use_extended_features=True,
-                    enable_cache_save=enable_cache_save
+                    enable_cache_save=enable_cache_save,
                 )
             )
 

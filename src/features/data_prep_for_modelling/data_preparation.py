@@ -58,7 +58,9 @@ def load_geo_config(config_path: Path):
     return str(geo_cache_file_path), amenities_df, amenity_radius_map
 
 
-def prepare_data_from_config(df, config_path, model_name, geo_cache_file=None, enable_cache_save=False):
+def prepare_data_from_config(
+    df, config_path, model_name, geo_cache_file=None, enable_cache_save=False
+):
     geo_cache_file_from_config, amenities_df, amenity_radius_map = (
         load_geo_config(config_path)
     )
@@ -67,7 +69,8 @@ def prepare_data_from_config(df, config_path, model_name, geo_cache_file=None, e
 
     if geo_cache_file is None:
         raise FileNotFoundError(
-            "Geo cache file not found! Check your YAML config or provide geo_cache_file explicitly."
+            "Geo cache file not found! " \
+            "Check your YAML config or provide geo_cache_file explicitly."
         )
 
     return prepare_data(
@@ -82,7 +85,7 @@ def prepare_data_from_config(df, config_path, model_name, geo_cache_file=None, e
         amenities_df=amenities_df,
         amenity_radius_map=amenity_radius_map,
         geo_cache_file=str(geo_cache_file),
-        enable_cache_save=enable_cache_save
+        enable_cache_save=enable_cache_save,
     )
 
 
@@ -255,7 +258,7 @@ def prepare_data(
                 amenity_meta=amenity_meta_out,
                 fit=False,
                 geo_cache_file=geo_cache_file,
-                enable_cache_save=enable_cache_save
+                enable_cache_save=enable_cache_save,
             )
 
         meta["expanded_features"] = list(set(X_train.columns) - pre_exp_cols)
