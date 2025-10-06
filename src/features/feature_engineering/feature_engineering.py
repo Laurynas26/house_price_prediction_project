@@ -14,7 +14,6 @@ from .encoding import encode_energy_label
 from src.features.feature_engineering.feature_expansion import (
     feature_expansion,
 )
-from typing import Optional
 
 
 # ------------------- Luxury Amenities -------------------
@@ -333,7 +332,8 @@ def prepare_features_test(
         use_geolocation (bool): If True, compute distance-based features.
         use_amenities (bool): If True, compute proximity to amenities features.
         amenities_df (pd.DataFrame): Optional amenities dataset for test set.
-        amenity_radius_map (dict): Optional radius mapping for amenity features.
+        amenity_radius_map (dict): Optional radius mapping 
+        for amenity features.
 
     Returns:
         pd.DataFrame: Transformed test dataframe ready for modeling.

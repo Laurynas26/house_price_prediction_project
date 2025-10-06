@@ -87,34 +87,6 @@ def encode_energy_label(
     return X, encoder
 
 
-def encode_train_val_only(X_train: pd.DataFrame, X_val: pd.DataFrame):
-    """
-    Encode the `energy_label` feature for training and validation sets.
-
-    The encoder is fitted on the training data and then applied to the
-    validation set to ensure leakage-safe encoding.
-
-    Parameters
-    ----------
-    X_train : pandas.DataFrame
-        Training dataframe containing `energy_label`.
-    X_val : pandas.DataFrame
-        Validation dataframe containing `energy_label`.
-
-    Returns
-    -------
-    X_train_enc : pandas.DataFrame
-        Training set with encoded energy labels.
-    X_val_enc : pandas.DataFrame
-        Validation set with encoded energy labels.
-    encoder : sklearn.preprocessing.OrdinalEncoder
-        Encoder fitted on the training data.
-    """
-    X_train_enc, encoder = encode_energy_label(X_train, fit=True)
-    X_val_enc, _ = encode_energy_label(X_val, encoder=encoder, fit=False)
-    return X_train_enc, X_val_enc, encoder
-
-
 # --------------------------
 # Fold-wise Feature Engineering
 # --------------------------
@@ -338,7 +310,8 @@ def prepare_fold_features(
             ):
                 addr = orig_df_["address"]
 
-                # If it's a DataFrame with duplicate columns, collapse to Series
+                # If it's a DataFrame with duplicate columns,
+                # collapse to Series
                 if isinstance(addr, pd.DataFrame):
                     addr = addr.iloc[:, 0]
 
