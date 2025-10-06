@@ -269,7 +269,7 @@ def prepare_features_train_val(
         amenity_radius_map=amenity_radius_map,
         amenity_meta=amenity_meta,
         fit=fit,
-        enable_cache_save=enable_cache_save
+        enable_cache_save=enable_cache_save,
     )
     if X_val is not None:
         X_val, _, _ = feature_expansion(
@@ -321,14 +321,15 @@ def prepare_features_test(
     enable_cache_save: bool = False,
 ):
     """
-    Prepare test features for modeling, including numeric/log transforms, binary flags,
-    luxury features, energy label encoding, categorical OHE, and optional feature expansion
-    with geolocation or amenities.
+    Prepare test features for modeling, including numeric/log transforms, 
+    binary flags, luxury features, energy label encoding, categorical OHE, 
+    and optional feature expansion with geolocation or amenities.
 
     Args:
         df_test (pd.DataFrame): Raw test dataframe.
-        meta (dict): Metadata from training/validation pipeline including medians,
-                     log columns, OHE columns, numeric/binary features, and geolocation/amenity metadata.
+        meta (dict): Metadata from training/validation pipeline including 
+                    medians, log columns, OHE columns, 
+                    numeric/binary features, and geolocation/amenity metadata.
         use_geolocation (bool): If True, compute distance-based features.
         use_amenities (bool): If True, compute proximity to amenities features.
         amenities_df (pd.DataFrame): Optional amenities dataset for test set.
@@ -404,7 +405,8 @@ def prepare_features_test(
     for col in preserve_cols:
         if col not in df_test.columns:
             raise ValueError(
-                f"Column '{col}' is required for geolocation but missing in test dataframe."
+                f"Column '{col}' is required for geolocation but "
+                "missing in test dataframe."
             )
 
     # ------------------- Combine features -------------------

@@ -1,4 +1,3 @@
-import os
 import pandas as pd
 import numpy as np
 from geopy.geocoders import Nominatim
@@ -69,7 +68,10 @@ def load_cache(cache_file):
     }
 
 
-def save_cache(lat_lon_cache, cache_file=CACHE_FILE, ):
+def save_cache(
+    lat_lon_cache,
+    cache_file=CACHE_FILE,
+):
     pd.DataFrame(
         [(addr, lat, lon) for addr, (lat, lon) in lat_lon_cache.items()],
         columns=["address", "lat", "lon"],
@@ -215,7 +217,8 @@ def enrich_with_amenities(
     df, amenities_df=None, amenity_radius_map=None, fit=True, amenity_meta=None
 ):
     """
-    Add amenity-based features (counts of schools, parks, etc.) using integer-encoded bins.
+    Add amenity-based features (counts of schools, parks, etc.)
+    using integer-encoded bins.
     Keeps only the `_bin_encoded` columns. Handles numpy arrays correctly.
     """
     df = df.copy()

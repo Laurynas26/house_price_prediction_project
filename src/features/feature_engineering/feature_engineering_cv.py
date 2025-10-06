@@ -1,10 +1,8 @@
 import pandas as pd
-import numpy as np
 from sklearn.preprocessing import OrdinalEncoder
 from typing import Optional
 
 from .encoding import encode_train_val_only
-from .utils import extract_floor, extract_lease_years, to_float
 from src.features.feature_engineering.feature_expansion import (
     feature_expansion,
 )
@@ -333,7 +331,11 @@ def prepare_fold_features(
 
     if include_distance:
         for df_, orig_df_ in [(X_train_final, X_train), (X_val_final, X_val)]:
-            if df_ is not None and "address" not in df_.columns and "address" in orig_df_.columns:
+            if (
+                df_ is not None
+                and "address" not in df_.columns
+                and "address" in orig_df_.columns
+            ):
                 addr = orig_df_["address"]
 
                 # If it's a DataFrame with duplicate columns, collapse to Series
