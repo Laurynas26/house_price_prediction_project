@@ -22,7 +22,8 @@ def feature_expansion(
     enable_cache_save: bool = False,
 ) -> Tuple[pd.DataFrame, Optional[Dict], Optional[Dict]]:
     """
-    Expand features with row-wise, neighborhood, building, outdoor, and optional geo/amenities metrics.
+    Expand features with row-wise, neighborhood, building, outdoor,
+    and optional geo/amenities metrics.
 
     Parameters
     ----------
@@ -102,7 +103,12 @@ def feature_expansion(
 
     if use_geolocation:
         df, geo_meta_out = enrich_with_geolocation(
-            df, use_geopy=False, cache_file=geo_cache_file, fit=fit, geo_meta=geo_meta, enable_cache_save=enable_cache_save, 
+            df,
+            use_geopy=False,
+            cache_file=geo_cache_file,
+            fit=fit,
+            geo_meta=geo_meta,
+            enable_cache_save=enable_cache_save,
         )
 
     # ------------------- Amenities Enrichment -------------------
@@ -110,7 +116,8 @@ def feature_expansion(
     if use_amenities:
         if amenities_df is None or amenity_radius_map is None:
             raise ValueError(
-                "amenities_df and amenity_radius_map must be provided when use_amenities=True"
+                "amenities_df and amenity_radius_map must be provided" \
+                " when use_amenities=True"
             )
         df, amenity_meta_out = enrich_with_amenities(
             df,
