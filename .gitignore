@@ -1,5 +1,8 @@
 # Ignore all scraped data
 data/
+*.png
+*.csv
+*.html
 
 # Ignore house pages url log
 config/house_pages_scraped.txt
@@ -7,7 +10,7 @@ config/house_pages_scraped.txt
 # Ignore MLflow tracking folder
 mlruns/
 logs/mlruns/
-
+logs/
 # Ignore Python junk
 __pycache__/
 *.pyc
