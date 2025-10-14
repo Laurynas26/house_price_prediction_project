@@ -67,7 +67,24 @@ class PipelineManager:
             load_cache=True,
             save_cache=False,
         )
+
         self.pipeline.run(smart_cache=True)
+        print("[DEBUG] After pipeline run:")
+        print(
+            " - X_train:",
+            type(self.pipeline.X_train),
+            getattr(self.pipeline.X_train, "shape", None),
+        )
+        print(" - scaler:", type(self.pipeline.scaler))
+        print(
+            " - meta keys:",
+            list(self.pipeline.meta.keys()) if self.pipeline.meta else None,
+        )
+
+        # --- Safety fallback ---
+        if self.pipeline.meta is None or self.pipeline.X_train is None:
+            print("[Manager] ⚠️ Cached pipeline incomplete, refitting...")
+            self.pipeline.run(smart_cache=False)
 
         # --- MLflow model loading ---
         production_model_name = model_cfg.get("production_model_name")
@@ -137,7 +154,9 @@ class PipelineManager:
             raise RuntimeError("PipelineManager not initialized.")
 
         try:
-            result = self.pipeline.preprocess_single(listing, drop_target=drop_target)
+            result = self.pipeline.preprocess_single(
+                listing, drop_target=drop_target
+            )
 
             # If pipeline returns a DataFrame (single row) convert -> dict
             if hasattr(result, "to_dict"):
@@ -147,7 +166,11 @@ class PipelineManager:
                 features_dict = result
             else:
                 # unexpected type
-                return {"success": False, "features": None, "error": f"Unsupported preprocess result type: {type(result)}"}
+                return {
+                    "success": False,
+                    "features": None,
+                    "error": f"Unsupported preprocess result type: {type(result)}",
+                }
 
             return {"success": True, "features": features_dict, "error": None}
         except Exception as e:
@@ -180,7 +203,9 @@ class PipelineManager:
             # Convert dict -> DataFrame for model if needed
             if isinstance(features_dict, dict):
                 features_df = pd.DataFrame([features_dict])
-            elif hasattr(features_dict, "to_dict") or hasattr(features_dict, "iloc"):
+            elif hasattr(features_dict, "to_dict") or hasattr(
+                features_dict, "iloc"
+            ):
                 # already a DataFrame/Series — try to coerce
                 features_df = pd.DataFrame(features_dict)
             else:
@@ -208,7 +233,6 @@ class PipelineManager:
                 "features": None,
                 "error": str(e),
             }
-
 
     # -------------------------------------------------------------------------
     # Full pipeline

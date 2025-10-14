@@ -3,6 +3,8 @@ from fastapi import FastAPI
 from src.api.endpoints import scrape, preprocess, predict, full_pipeline
 from src.api.core.manager import PipelineManager
 
+manager = PipelineManager()
+
 
 # ----------------------------------------
 # Startup Event: initialize the manager
@@ -50,3 +52,5 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run("src.api.main:app", host="127.0.0.1", port=8000, reload=True)
+
+print(f"Lifespan handler attached? {app.router.lifespan_context is not None}")
