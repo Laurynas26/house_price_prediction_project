@@ -2,9 +2,11 @@ from dataclasses import dataclass
 from pathlib import Path
 import pandas as pd
 from typing import Optional, Dict, Any
-import yaml
 
-from src.data_loading.data_loading.data_loader import load_data_from_json
+from src.data_loading.data_loading.data_loader import (
+    load_data_from_json,
+    json_to_df_raw_strict,
+)
 from src.data_loading.preprocessing.preprocessing import preprocess_df
 from src.data_loading.preprocessing.imputation import impute_missing_values
 from src.features.data_prep_for_modelling.data_preparation import (
@@ -18,8 +20,6 @@ from src.data_loading.data_cache import CacheManager
 
 @dataclass
 class PipelineResult:
-    """Container for final processed datasets and metadata."""
-
     X_train: pd.DataFrame
     X_val: Optional[pd.DataFrame]
     X_test: pd.DataFrame
@@ -32,13 +32,7 @@ class PipelineResult:
 
 
 class PreprocessingPipeline:
-    """
-    Modular preprocessing pipeline for real estate data.
-
-    This class orchestrates data loading, preprocessing, imputation, and
-    feature engineering steps. It includes optional caching via CacheManager
-    to avoid recomputation when configurations or raw data remain unchanged.
-    """
+    """Full data preprocessing and feature engineering pipeline."""
 
     def __init__(
         self,
@@ -66,7 +60,6 @@ class PreprocessingPipeline:
         self.scaler = None
         self.meta = {}
 
-        # Define sequential steps
         self.steps = [
             self.load_data,
             self.preprocess,
@@ -92,15 +85,13 @@ class PreprocessingPipeline:
                 "feature_engineering": (
                     "feature_eng_result",
                     self.config_paths.get("model"),
-                    "xgboost_early_stopping_optuna_feature_eng_geoloc_exp",
+                    self.model_name,
                 ),
             }
 
-            # Smart caching logic
             if smart_cache and step_name in cache_key_map:
                 key_info = cache_key_map[step_name]
-                cache_key = key_info[0]
-                cfg = key_info[1]
+                cache_key, cfg = key_info[0], key_info[1]
                 scope = key_info[2] if len(key_info) > 2 else None
 
                 if self.cache.exists(cache_key, cfg, scope=scope):
@@ -125,8 +116,24 @@ class PreprocessingPipeline:
                         ) = cached_data
                     continue
 
-            # Otherwise, run the step
             step()
+
+        # Capture expected feature schema
+        if self.X_train is not None:
+            self.expected_columns = self.X_train.columns.tolist()
+
+        # ✅ Save minimal inference schema for future single-listing processing
+        if self.save_cache and self.X_train is not None and self.meta:
+            inference_meta = {
+                "meta": self.meta,
+                "expected_columns": self.X_train.columns.tolist(),
+            }
+            self.cache.save(
+                inference_meta, "inference_meta", scope=self.model_name
+            )
+            print(
+                "[CACHE] Saved inference_meta for future single listing preprocessing."
+            )
 
         return PipelineResult(
             X_train=self.X_train,
@@ -192,7 +199,6 @@ class PreprocessingPipeline:
         model_name = self.model_name
         model_cfg_dict = self.config_paths.get("model", {})
 
-        # Cached version?
         if self.load_cache and self.cache.exists(
             "feature_eng_result", model_cfg_dict, scope=model_name
         ):
@@ -214,7 +220,6 @@ class PreprocessingPipeline:
             )
             return
 
-        # Run feature engineering
         (
             self.X_train,
             self.X_test,
@@ -256,31 +261,43 @@ class PreprocessingPipeline:
         self, listing: dict, drop_target: bool = False
     ) -> pd.DataFrame:
         """
-        Preprocess a single listing dict using the fitted pipeline.
-        Returns a DataFrame aligned with training features (no scaler required).
+        Preprocess a single listing JSON dict into a model-ready feature DataFrame.
+        Ensures schema consistency with training data.
         """
-        if self.df_clean is None or self.meta is None or self.X_train is None:
-            raise RuntimeError("Pipeline must be run first to fit transforms!")
 
-        # Convert dict to DataFrame
-        df = pd.DataFrame([listing])
+        # --- 0. Try loading inference schema if pipeline wasn’t run ---
+        if (
+            self.meta is None or getattr(self, "X_train", None) is None
+        ) and self.cache.exists("inference_meta", scope=self.model_name):
+            print("[INFO] Loading inference metadata from cache...")
+            inference_meta = self.cache.load(
+                "inference_meta", scope=self.model_name
+            )
+            self.meta = inference_meta["meta"]
+            self.expected_columns = inference_meta["expected_columns"]
+        elif self.meta is None or getattr(self, "X_train", None) is None:
+            raise RuntimeError(
+                "Pipeline must be run first or inference cache missing."
+            )
 
-        # Basic preprocessing
+        # --- 1. Normalize JSON to DataFrame (strict schema) ---
+        df_raw = json_to_df_raw_strict(listing)
+
+        # --- 2. Apply preprocessing ---
         cfg = self.config_paths["preprocessing"]
         df = preprocess_df(
-            df,
+            df_raw,
             drop_raw=cfg.get("drop_raw", True),
             numeric_cols=cfg.get("numeric_cols", []),
         )
 
-        # Imputation
-        imputation_cfg = cfg.get("imputation", {})
-        df = impute_missing_values(df, imputation_cfg)
+        # --- 3. Imputation ---
+        df = impute_missing_values(df, cfg.get("imputation", {}))
 
-        # Feature engineering (test mode)
+        # --- 4. Feature engineering ---
         df = prepare_features_test(
             df,
-            self.meta,
+            meta=self.meta,
             use_geolocation=bool(self.meta.get("geo_meta")),
             use_amenities=bool(self.meta.get("amenity_meta")),
             amenities_df=self.meta.get("amenities_df"),
@@ -288,21 +305,17 @@ class PreprocessingPipeline:
             geo_cache_file=self.meta.get("geo_cache_file"),
         )
 
-        # Drop address if present
-        if "address" in df.columns:
-            df.drop(columns="address", inplace=True)
-
-        # Align columns with training set
-        X_train_cols = self.X_train.columns
-        for col in X_train_cols:
+        # --- 5. Align with training features ---
+        expected_cols = getattr(self, "expected_columns", self.X_train.columns)
+        for col in expected_cols:
             if col not in df.columns:
-                df[col] = 0
-        extra_cols = [c for c in df.columns if c not in X_train_cols]
-        if extra_cols:
-            df.drop(columns=extra_cols, inplace=True)
-        df = df[X_train_cols]
+                # Fill missing engineered features safely
+                df[col] = 0 if col.startswith("has_") else pd.NA
 
-        # Drop target columns if they exist
+        # Drop extra columns and reorder
+        df = df.reindex(columns=expected_cols)
+
+        # --- 6. Optionally drop targets ---
         if drop_target:
             df = df.drop(columns=["price", "price_num"], errors="ignore")
 
