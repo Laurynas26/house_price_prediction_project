@@ -352,6 +352,12 @@ def prepare_features_test(
     df_test = apply_log_transform(df_test, meta["log_cols"])
 
     # ------------------- Binary flags -------------------
+    # Ensure all expected binary flags exist
+    for col in meta["binary_flags"]:
+        if col not in df_test.columns:
+            df_test[col] = pd.NA  # fallback if missing
+
+    # Fill missing and cast to int
     for col in meta["binary_flags"]:
         df_test[col] = df_test[col].fillna(0).astype(int)
 

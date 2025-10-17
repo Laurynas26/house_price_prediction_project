@@ -142,8 +142,7 @@ class PipelineManager:
     ) -> Dict[str, Any]:
         """
         Preprocess a single listing dict using the fitted pipeline.
-
-        Returns a dict with consistent structure:
+        Returns a dict with structure:
         {
             "success": bool,
             "features": dict,
@@ -154,35 +153,31 @@ class PipelineManager:
             raise RuntimeError("PipelineManager not initialized.")
 
         try:
-            result = self.pipeline.preprocess_single(
-                listing, drop_target=drop_target
-            )
-
-            # If pipeline returns a DataFrame (single row) convert -> dict
-            if hasattr(result, "to_dict"):
-                features_dict = result.to_dict(orient="records")[0]
-            # If pipeline already returned a dict (some implementations), use it
-            elif isinstance(result, dict):
-                features_dict = result
+            # If already preprocessed dict, skip reprocessing
+            if "features" in listing:
+                features_dict = listing["features"]
             else:
-                # unexpected type
-                return {
-                    "success": False,
-                    "features": None,
-                    "error": f"Unsupported preprocess result type: {type(result)}",
-                }
+                result = self.pipeline.preprocess_single(
+                    listing, drop_target=drop_target
+                )
+                features_dict = (
+                    result.to_dict(orient="records")[0]
+                    if hasattr(result, "to_dict")
+                    else dict(result)
+                )
 
             return {"success": True, "features": features_dict, "error": None}
+
         except Exception as e:
             return {"success": False, "features": None, "error": str(e)}
 
     # -------------------------------------------------------------------------
     # Prediction
     # -------------------------------------------------------------------------
-    def predict(self, listing: Dict[str, Any]) -> Dict[str, Any]:
+    def predict(self, features: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Preprocess and predict price for a single listing.
-        Returns consistent dict:
+        Predict price from preprocessed features (dict aligned with training columns).
+        Returns:
         {
             "success": bool,
             "prediction": float or None,
@@ -193,39 +188,23 @@ class PipelineManager:
         if not self._initialized:
             raise RuntimeError("PipelineManager not initialized.")
 
-        preprocess_result = self.preprocess(listing, drop_target=True)
-        if not preprocess_result["success"]:
-            return {**preprocess_result, "prediction": None}
-
         try:
-            features_dict = preprocess_result["features"]
-
-            # Convert dict -> DataFrame for model if needed
-            if isinstance(features_dict, dict):
-                features_df = pd.DataFrame([features_dict])
-            elif hasattr(features_dict, "to_dict") or hasattr(
-                features_dict, "iloc"
-            ):
-                # already a DataFrame/Series — try to coerce
-                features_df = pd.DataFrame(features_dict)
+            # Convert dict -> DataFrame
+            if isinstance(features, dict):
+                features_df = pd.DataFrame([features])
             else:
-                return {
-                    "success": False,
-                    "prediction": None,
-                    "features": None,
-                    "error": f"Unsupported features type for prediction: {type(features_dict)}",
-                }
+                features_df = pd.DataFrame(features)
 
-            # If model expects DMatrix, create it (your model is an XGBoost Booster)
             dmatrix = xgb.DMatrix(features_df)
             pred_value = float(self.model.predict(dmatrix)[0])
 
             return {
                 "success": True,
                 "prediction": pred_value,
-                "features": features_dict,
+                "features": features,
                 "error": None,
             }
+
         except Exception as e:
             return {
                 "success": False,
@@ -246,10 +225,21 @@ class PipelineManager:
         if not self._initialized:
             raise RuntimeError("PipelineManager not initialized.")
 
+        # Step 1: Scrape
         scrape_result = self.scrape(url, headless=headless)
         if not scrape_result["success"]:
             return scrape_result
 
         listing = scrape_result["data"]
-        predict_result = self.predict(listing)
-        return {**predict_result, "url": url}
+
+        # Step 2: Preprocess
+        preprocess_result = self.preprocess(listing, drop_target=True)
+        if not preprocess_result["success"]:
+            return preprocess_result
+
+        features = preprocess_result["features"]
+
+        # Step 3: Predict
+        prediction_result = self.predict(features)
+
+        return {**prediction_result, "url": url}
