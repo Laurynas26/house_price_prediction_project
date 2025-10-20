@@ -1,7 +1,6 @@
 from pathlib import Path
 from typing import Dict, Any
 import yaml
-import mlflow.xgboost
 import xgboost as xgb
 import pandas as pd
 
@@ -153,23 +152,38 @@ class PipelineManager:
             raise RuntimeError("PipelineManager not initialized.")
 
         try:
+            print("=== Incoming /preprocess request ===")
+            print("Incoming listing keys:", list(listing.keys()))
+            if "data" in listing:
+                print("Subkeys under 'data':", list(listing["data"].keys()))
+
             # If already preprocessed dict, skip reprocessing
             if "features" in listing:
                 features_dict = listing["features"]
             else:
-                result = self.pipeline.preprocess_single(
+                df_result = self.pipeline.preprocess_single(
                     listing, drop_target=drop_target
                 )
-                features_dict = (
-                    result.to_dict(orient="records")[0]
-                    if hasattr(result, "to_dict")
-                    else dict(result)
-                )
+
+                # Safely convert to dict
+                if isinstance(df_result, pd.DataFrame):
+                    if not df_result.empty:
+                        features_dict = df_result.iloc[0].to_dict()
+                    else:
+                        raise ValueError("Preprocessed DataFrame is empty.")
+                else:
+                    features_dict = dict(df_result)
 
             return {"success": True, "features": features_dict, "error": None}
 
         except Exception as e:
+            import traceback
+            print("\n--- ERROR INSIDE manager.preprocess ---")
+            print(f"Type: {type(e)}")
+            print(f"Message: {e}")
+            traceback.print_exc(limit=10)
             return {"success": False, "features": None, "error": str(e)}
+
 
     # -------------------------------------------------------------------------
     # Prediction
