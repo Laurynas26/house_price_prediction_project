@@ -190,7 +190,8 @@ class PipelineManager:
     # -------------------------------------------------------------------------
     def predict(self, features: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Predict price from preprocessed features (dict aligned with training columns).
+        Predict price from preprocessed features (dict aligned
+        with training columns).
         Returns:
         {
             "success": bool,
