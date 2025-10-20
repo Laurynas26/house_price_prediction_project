@@ -3,7 +3,10 @@ import mlflow
 import mlflow.xgboost
 from mlflow.tracking import MlflowClient
 
-def load_latest_mlflow_model(model_name: str, experiment_name: str = "house_price_prediction"):
+
+def load_latest_mlflow_model(
+    model_name: str, experiment_name: str = "house_price_prediction"
+):
     """
     Load the latest MLflow run of a model by name, ignoring .trash or incomplete runs.
 
@@ -23,7 +26,9 @@ def load_latest_mlflow_model(model_name: str, experiment_name: str = "house_pric
             break
         project_root = project_root.parent
     else:
-        raise RuntimeError("❌ Could not find 'logs/mlruns' folder in project hierarchy.")
+        raise RuntimeError(
+            "❌ Could not find 'logs/mlruns' folder in project hierarchy."
+        )
 
     print(f"[MLflow] Using MLruns folder: {mlruns_path}")
 
@@ -36,19 +41,27 @@ def load_latest_mlflow_model(model_name: str, experiment_name: str = "house_pric
     client = MlflowClient()
     experiment = client.get_experiment_by_name(experiment_name)
     if experiment is None:
-        raise RuntimeError(f"❌ Experiment '{experiment_name}' not found in MLflow.")
+        raise RuntimeError(
+            f"❌ Experiment '{experiment_name}' not found in MLflow."
+        )
     experiment_id = experiment.experiment_id
-    print(f"[MLflow] Using experiment '{experiment_name}' with ID {experiment_id}")
+    print(
+        f"[MLflow] Using experiment '{experiment_name}' with ID {experiment_id}"
+    )
 
     # --- Step 4: Get all finished runs with the correct runName ---
     all_runs = client.search_runs(
         experiment_ids=[experiment_id],
         filter_string=f"tags.mlflow.runName = '{model_name}'",
-        order_by=["attributes.start_time DESC"]
+        order_by=["attributes.start_time DESC"],
     )
 
     # Filter out runs with empty artifact_uri or not FINISHED
-    valid_runs = [r for r in all_runs if r.info.status == "FINISHED" and r.info.artifact_uri]
+    valid_runs = [
+        r
+        for r in all_runs
+        if r.info.status == "FINISHED" and r.info.artifact_uri
+    ]
     if not valid_runs:
         raise RuntimeError(
             f"❌ No valid MLflow runs found for runName '{model_name}' in experiment '{experiment_name}'"

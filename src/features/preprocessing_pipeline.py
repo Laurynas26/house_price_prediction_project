@@ -305,11 +305,14 @@ class PreprocessingPipeline:
             geo_cache_file=self.meta.get("geo_cache_file"),
         )
 
+        # --- 4b. Ensure all categorical dummy columns exist ---
+        df = ensure_all_categorical_columns(df, self.meta)
+
+
         # --- 5. Align with training features ---
         expected_cols = getattr(self, "expected_columns", self.X_train.columns)
         for col in expected_cols:
             if col not in df.columns:
-                # Fill missing engineered features safely
                 df[col] = 0 if col.startswith("has_") else pd.NA
 
         # Drop extra columns and reorder
@@ -321,3 +324,59 @@ class PreprocessingPipeline:
 
         print(f"[Preprocess Single] Aligned to {len(df.columns)} features.")
         return df
+
+
+# -------------------------------------------------------------------------
+# Helpers
+# -------------------------------------------------------------------------
+def ensure_facility_columns(
+    df: pd.DataFrame, key_facilities: list[str]
+) -> pd.DataFrame:
+    """
+    Ensure all facility indicator columns exist in df.
+    Missing ones are added with 0; extra columns are ignored.
+    """
+    for col in key_facilities:
+        if col not in df.columns:
+            df[col] = 0
+
+    # Reorder to match training layout
+    return df[
+        key_facilities + [c for c in df.columns if c not in key_facilities]
+    ]
+
+
+def ensure_all_categorical_columns(
+    df: pd.DataFrame, meta: dict
+) -> pd.DataFrame:
+    """
+    Ensures that all one-hot encoded categorical columns seen during training exist.
+    Handles:
+      - Facilities
+      - Energy label
+      - Roof type
+      - Ownership type
+      - Neighborhood
+    Missing ones are added with 0.
+    """
+
+    # Facility columns
+    if "key_facilities" in meta:
+        df = ensure_facility_columns(df, meta["key_facilities"])
+
+    # Generic categorical one-hot columns
+    for cat_key in [
+        "energy_label_cols",
+        "roof_type_cols",
+        "ownership_type_cols",
+        "neighborhood_cols",
+    ]:
+        expected_cols = meta.get(cat_key)
+        if not expected_cols:
+            continue
+
+        for col in expected_cols:
+            if col not in df.columns:
+                df[col] = 0
+
+    return df
