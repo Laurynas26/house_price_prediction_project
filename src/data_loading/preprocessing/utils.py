@@ -101,15 +101,16 @@ def parse_year(year):
         elif year.isdigit():
             return int(year)
         else:
-            return None  # invalid string
+            return np.nan
     elif isinstance(year, (int, float)):
         return int(year)
     else:
-        return None
+        return np.nan
 
 
 def coerce_numeric(df, cols):
     return df[cols].apply(pd.to_numeric, errors="coerce")
+
 
 def apply_parsers(df, col_parser_map):
     for col, parser in col_parser_map.items():
