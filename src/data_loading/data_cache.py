@@ -35,11 +35,22 @@ class CacheManager:
     def _normalize_config(
         config: Optional[dict], scope: Optional[str] = None
     ) -> Optional[dict]:
-        """Extract a sub-config by scope name (e.g., 'xgboost_early_stopping')."""
+        """
+        Extract a sub-config by scope name (e.g., 'preprocessing' or 'model').
+        If scope is not found, returns the full config instead of raising KeyError.
+        """
         if config is None:
             return None
-        if scope and scope in config:
-            return config[scope]
+
+        if scope:
+            if not isinstance(config, dict):
+                raise TypeError(
+                    f"Expected dict for config, got {type(config)}"
+                )
+            return config.get(
+                scope, config
+            )  # <- return subconfig or full config
+
         return config
 
     @staticmethod
