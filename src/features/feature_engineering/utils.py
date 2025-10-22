@@ -33,12 +33,19 @@ def extract_floor(x):
 
 def extract_lease_years(x, current_year=2025):
     """Extract lease years remaining from ownership text."""
-    if pd.isna(x) or "Volle eigendom" in str(x) or str(x).strip() == "":
+    if isinstance(x, pd.Series):
+        x = x.iloc[0] if not x.empty else None
+    elif isinstance(x, (list, tuple)):
+        x = x[0] if len(x) > 0 else None
+
+    if pd.isna(x) or str(x).strip() == "" or "Volle eigendom" in str(x):
         return np.nan
+
     match = re.search(r"einddatum erfpacht: (\d{2})-(\d{2})-(\d{4})", str(x))
     if match:
         _, _, year = map(int, match.groups())
         return max(year - current_year, 0)
+
     return np.nan
 
 

@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 from .utils import (
     to_float,
     extract_floor,
@@ -320,19 +321,19 @@ def prepare_features_test(
     enable_cache_save: bool = False,
 ):
     """
-    Prepare test features for modeling, including numeric/log transforms, 
-    binary flags, luxury features, energy label encoding, categorical OHE, 
+    Prepare test features for modeling, including numeric/log transforms,
+    binary flags, luxury features, energy label encoding, categorical OHE,
     and optional feature expansion with geolocation or amenities.
 
     Args:
         df_test (pd.DataFrame): Raw test dataframe.
-        meta (dict): Metadata from training/validation pipeline including 
-                    medians, log columns, OHE columns, 
+        meta (dict): Metadata from training/validation pipeline including
+                    medians, log columns, OHE columns,
                     numeric/binary features, and geolocation/amenity metadata.
         use_geolocation (bool): If True, compute distance-based features.
         use_amenities (bool): If True, compute proximity to amenities features.
         amenities_df (pd.DataFrame): Optional amenities dataset for test set.
-        amenity_radius_map (dict): Optional radius mapping 
+        amenity_radius_map (dict): Optional radius mapping
         for amenity features.
 
     Returns:
@@ -360,9 +361,60 @@ def prepare_features_test(
     # Fill missing and cast to int
     for col in meta["binary_flags"]:
         df_test[col] = df_test[col].fillna(0).astype(int)
-
     # ------------------- Extra numeric -------------------
     df_test["floor_level"] = df_test["located_on"].apply(extract_floor)
+
+    # Debug prints to check the problem
+    print("=== Debug: Checking df_test ===")
+    print("Duplicate row indices:", df_test.index.duplicated().sum())
+    print("Duplicate column names:", df_test.columns.duplicated().sum())
+    print(
+        df_test.columns[df_test.columns.duplicated()],
+        "duplicated column names if any",
+    )
+    duplicates = df_test.columns[df_test.columns.duplicated()].unique()
+    print("Duplicate column names:", duplicates)
+
+    # Find duplicated columns
+    dup_cols = df_test.columns[df_test.columns.duplicated()].unique()
+    print("Duplicate columns:", dup_cols)
+
+    # Inspect their contents
+    for col in dup_cols:
+        print(f"\nColumn: {col}")
+        duplicates = df_test.loc[
+            :, df_test.columns == col
+        ]  # select all duplicates of this column
+        print(duplicates)
+
+    if df_test.columns.duplicated().any():
+        print("[DEBUG] Deduplicating duplicate columns safely...")
+
+        deduped = {}
+        for col in df_test.columns.unique():
+            # Select all duplicate instances of this column
+            dup_cols = df_test.loc[:, df_test.columns == col]
+
+            # Reduce each row across duplicates
+            def first_non_null(row):
+                for v in row:
+                    # Handle lists/arrays robustly
+                    if isinstance(v, (list, np.ndarray, pd.Series)):
+                        # Flatten and find first non-null element inside
+                        inner = next(
+                            (vv for vv in np.ravel(v) if pd.notna(vv)), None
+                        )
+                        if inner is not None:
+                            return inner
+                    elif pd.notna(v):
+                        return v
+                return None
+
+            deduped[col] = dup_cols.apply(first_non_null, axis=1)
+
+        df_test = pd.DataFrame(deduped)
+
+    # Now it's safe to add new numeric features
     df_test["lease_years_remaining"] = (
         df_test["ownership_type"].apply(extract_lease_years).fillna(0)
     )

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from pathlib import Path
-import pandas as pd
 from typing import Optional, Dict, Any
+import pandas as pd
 
 from src.data_loading.data_loading.data_loader import (
     load_data_from_json,
@@ -32,7 +32,7 @@ class PipelineResult:
 
 
 class PreprocessingPipeline:
-    """Full data preprocessing and feature engineering pipeline."""
+    """Full preprocessing and feature engineering pipeline with caching support."""
 
     def __init__(
         self,
@@ -52,14 +52,16 @@ class PreprocessingPipeline:
         self.model_config_path = model_config_path
         self.model_name = model_name
 
-        # Storage
+        # Data storage
         self.df_raw = None
         self.df_clean = None
         self.X_train = self.X_val = self.X_test = None
         self.y_train = self.y_val = self.y_test = None
         self.scaler = None
         self.meta = {}
+        self.expected_columns = []
 
+        # Pipeline steps
         self.steps = [
             self.load_data,
             self.preprocess,
@@ -68,52 +70,37 @@ class PreprocessingPipeline:
             self.feature_engineering,
         ]
 
+        # Cache key map for DRY smart caching
+        self.cache_key_map = {
+            "load_data": ("df_raw", None, None),
+            "preprocess": (
+                "df_preprocessed",
+                self.config_paths,
+                "preprocessing",
+            ),
+            "feature_engineering": (
+                "feature_eng_result",
+                self.config_paths,
+                self.model_name,
+            ),
+        }
+
     # -------------------------------------------------------------------------
     # Pipeline Execution
     # -------------------------------------------------------------------------
     def run(self, smart_cache: bool = True) -> PipelineResult:
-        """Run the full preprocessing pipeline."""
         for step in self.steps:
             step_name = step.__name__
 
-            cache_key_map = {
-                "load_data": ("df_raw", None),
-                "preprocess": (
-                    "df_preprocessed",
-                    self.config_paths.get("preprocessing"),
-                ),
-                "feature_engineering": (
-                    "feature_eng_result",
-                    self.config_paths.get("model"),
-                    self.model_name,
-                ),
-            }
-
-            if smart_cache and step_name in cache_key_map:
-                key_info = cache_key_map[step_name]
-                cache_key, cfg = key_info[0], key_info[1]
-                scope = key_info[2] if len(key_info) > 2 else None
-
+            key_info = self.cache_key_map.get(step_name)
+            if smart_cache and key_info:
+                cache_key, cfg, scope = key_info
                 if self.cache.exists(cache_key, cfg, scope=scope):
                     print(
                         f"[SMART CACHE] Skipping {step_name}, loading cached result"
                     )
                     cached_data = self.cache.load(cache_key, cfg, scope=scope)
-                    if step_name == "load_data":
-                        self.df_raw = cached_data
-                    elif step_name == "preprocess":
-                        self.df_clean = cached_data
-                    elif step_name == "feature_engineering":
-                        (
-                            self.X_train,
-                            self.X_val,
-                            self.X_test,
-                            self.y_train,
-                            self.y_val,
-                            self.y_test,
-                            self.scaler,
-                            self.meta,
-                        ) = cached_data
+                    self._restore_from_cache(step_name, cached_data)
                     continue
 
             step()
@@ -122,7 +109,7 @@ class PreprocessingPipeline:
         if self.X_train is not None:
             self.expected_columns = self.X_train.columns.tolist()
 
-        # ✅ Save minimal inference schema for future single-listing processing
+        # Save minimal inference schema
         if self.save_cache and self.X_train is not None and self.meta:
             inference_meta = {
                 "meta": self.meta,
@@ -147,6 +134,23 @@ class PreprocessingPipeline:
             df_clean=self.df_clean,
         )
 
+    def _restore_from_cache(self, step_name: str, cached_data: Any):
+        if step_name == "load_data":
+            self.df_raw = cached_data
+        elif step_name == "preprocess":
+            self.df_clean = cached_data
+        elif step_name == "feature_engineering":
+            (
+                self.X_train,
+                self.X_val,
+                self.X_test,
+                self.y_train,
+                self.y_val,
+                self.y_test,
+                self.scaler,
+                self.meta,
+            ) = cached_data
+
     # -------------------------------------------------------------------------
     # Step Implementations
     # -------------------------------------------------------------------------
@@ -160,12 +164,12 @@ class PreprocessingPipeline:
                 self.cache.save(self.df_raw, "df_raw")
 
     def preprocess(self):
-        cfg = self.config_paths["preprocessing"]
+        cfg = self.config_paths.get("preprocessing", {})
         if self.load_cache and self.cache.exists(
-            "df_preprocessed", cfg, scope="preprocessing"
+            "df_preprocessed", self.config_paths, scope="preprocessing"
         ):
             self.df_clean = self.cache.load(
-                "df_preprocessed", cfg, scope="preprocessing"
+                "df_preprocessed", self.config_paths, scope="preprocessing"
             )
         else:
             self.df_clean = preprocess_df(
@@ -178,43 +182,29 @@ class PreprocessingPipeline:
                 self.cache.save(
                     self.df_clean,
                     "df_preprocessed",
-                    cfg,
+                    self.config_paths,
                     scope="preprocessing",
                 )
 
     def impute(self):
-        imputation_cfg = self.config_paths["preprocessing"].get(
-            "imputation", {}
-        )
+        cfg = self.config_paths.get("preprocessing", {})
+        imputation_cfg = cfg.get("imputation", {})
         self.df_clean = impute_missing_values(self.df_clean, imputation_cfg)
         print("Imputation done")
 
     def drop_missing_target(self):
         self.df_clean = self.df_clean[self.df_clean["price_num"].notna()]
-        if "living_area" in self.df_clean.columns:
-            self.df_clean.drop(columns=["living_area"], inplace=True)
         print("Dropped missing target rows")
 
     def feature_engineering(self):
-        model_name = self.model_name
-        model_cfg_dict = self.config_paths.get("model", {})
-
+        model_cfg = self.config_paths.get("model", {})
         if self.load_cache and self.cache.exists(
-            "feature_eng_result", model_cfg_dict, scope=model_name
+            "feature_eng_result", self.config_paths, scope=self.model_name
         ):
             data = self.cache.load(
-                "feature_eng_result", model_cfg_dict, scope=model_name
+                "feature_eng_result", self.config_paths, scope=self.model_name
             )
-            (
-                self.X_train,
-                self.X_val,
-                self.X_test,
-                self.y_train,
-                self.y_val,
-                self.y_test,
-                self.scaler,
-                self.meta,
-            ) = data
+            self._restore_from_cache("feature_engineering", data)
             print(
                 f"Loaded cached feature-engineered data: {self.X_train.shape}"
             )
@@ -232,7 +222,7 @@ class PreprocessingPipeline:
         ) = prepare_data_from_config(
             df=self.df_clean,
             config_path=self.model_config_path,
-            model_name=model_name,
+            model_name=self.model_name,
             enable_cache_save=True,
         )
         print(f"Feature engineering done: Train shape {self.X_train.shape}")
@@ -250,8 +240,8 @@ class PreprocessingPipeline:
                     self.meta,
                 ),
                 "feature_eng_result",
-                model_cfg_dict,
-                scope=model_name,
+                self.config_paths,
+                scope=self.model_name,
             )
 
     # -------------------------------------------------------------------------
@@ -264,10 +254,8 @@ class PreprocessingPipeline:
         Preprocess a single listing JSON dict into a model-ready feature DataFrame.
         Ensures schema consistency with training data.
         """
-
-        # --- 0. Try loading inference schema if pipeline wasn’t run ---
         if (
-            self.meta is None or getattr(self, "X_train", None) is None
+            not self.meta or getattr(self, "X_train", None) is None
         ) and self.cache.exists("inference_meta", scope=self.model_name):
             print("[INFO] Loading inference metadata from cache...")
             inference_meta = self.cache.load(
@@ -275,26 +263,19 @@ class PreprocessingPipeline:
             )
             self.meta = inference_meta["meta"]
             self.expected_columns = inference_meta["expected_columns"]
-        elif self.meta is None or getattr(self, "X_train", None) is None:
+        elif not self.meta or getattr(self, "X_train", None) is None:
             raise RuntimeError(
                 "Pipeline must be run first or inference cache missing."
             )
 
-        # --- 1. Normalize JSON to DataFrame (strict schema) ---
         df_raw = json_to_df_raw_strict(listing)
-
-        # --- 2. Apply preprocessing ---
-        cfg = self.config_paths["preprocessing"]
+        cfg = self.config_paths.get("preprocessing", {})
         df = preprocess_df(
             df_raw,
             drop_raw=cfg.get("drop_raw", True),
             numeric_cols=cfg.get("numeric_cols", []),
         )
-
-        # --- 3. Imputation ---
         df = impute_missing_values(df, cfg.get("imputation", {}))
-
-        # --- 4. Feature engineering ---
         df = prepare_features_test(
             df,
             meta=self.meta,
@@ -304,21 +285,14 @@ class PreprocessingPipeline:
             amenity_radius_map=self.meta.get("amenity_radius_map"),
             geo_cache_file=self.meta.get("geo_cache_file"),
         )
-
-        # --- 4b. Ensure all categorical dummy columns exist ---
         df = ensure_all_categorical_columns(df, self.meta)
 
-
-        # --- 5. Align with training features ---
-        expected_cols = getattr(self, "expected_columns", self.X_train.columns)
-        for col in expected_cols:
+        # Align with training columns
+        for col in self.expected_columns:
             if col not in df.columns:
                 df[col] = 0 if col.startswith("has_") else pd.NA
+        df = df.reindex(columns=self.expected_columns)
 
-        # Drop extra columns and reorder
-        df = df.reindex(columns=expected_cols)
-
-        # --- 6. Optionally drop targets ---
         if drop_target:
             df = df.drop(columns=["price", "price_num"], errors="ignore")
 
@@ -339,8 +313,6 @@ def ensure_facility_columns(
     for col in key_facilities:
         if col not in df.columns:
             df[col] = 0
-
-    # Reorder to match training layout
     return df[
         key_facilities + [c for c in df.columns if c not in key_facilities]
     ]
@@ -360,23 +332,15 @@ def ensure_all_categorical_columns(
     Missing ones are added with 0.
     """
 
-    # Facility columns
     if "key_facilities" in meta:
         df = ensure_facility_columns(df, meta["key_facilities"])
-
-    # Generic categorical one-hot columns
     for cat_key in [
         "energy_label_cols",
         "roof_type_cols",
         "ownership_type_cols",
         "neighborhood_cols",
     ]:
-        expected_cols = meta.get(cat_key)
-        if not expected_cols:
-            continue
-
-        for col in expected_cols:
+        for col in meta.get(cat_key, []):
             if col not in df.columns:
                 df[col] = 0
-
     return df
