@@ -96,3 +96,18 @@ if result.get("success"):
         print(f"{k}: {features[k]}")
 else:
     print("\nPreprocessing failed:", result.get("error"))
+
+# -------------------------
+# Predict price for the listing
+# -------------------------
+if result.get("success"):
+    features = result["features"]
+    prediction_result = manager.predict(features)
+
+    print("\n=== Prediction Result ===")
+    pprint.pprint(prediction_result)
+    if prediction_result["success"]:
+        print(f"\nPredicted price: €{prediction_result['prediction']:.0f}")
+    else:
+        print("Prediction failed:", prediction_result["error"])
+
