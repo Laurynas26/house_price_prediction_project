@@ -80,12 +80,19 @@ def parse_size(s):
 def split_postal_city(s):
     """
     Split postal code and city from a string like '1012 AB Amsterdam'.
+    Returns (postal_code_clean, city)
     """
+
     if not isinstance(s, str):
         return pd.NA, pd.NA
-    parts = s.strip().rsplit(" ", 1)
-    if len(parts) == 2:
-        return parts[0], parts[1]
+
+    s = s.strip().upper()  # uppercase and remove extra spaces
+    match = re.match(r"(\d{4}\s?[A-Z]{2})\s*(.*)", s)
+    if match:
+        postal_code = match.group(1)
+        city = match.group(2) if match.group(2) else pd.NA
+        return postal_code, city
+
     return s, pd.NA
 
 

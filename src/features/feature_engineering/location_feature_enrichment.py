@@ -89,15 +89,20 @@ def enrich_with_geolocation(
 ) -> tuple[pd.DataFrame, dict]:
     """
     Adds lat/lon + distance-to-center features using a cache + fallback system.
-    Distance bins are integer-encoded for tree-based models.
+
+    Training mode (fit=True): missing addresses can be fetched via geopy and
+    postal/neighborhood centroids are computed for later fallback.
+
+    Inference mode (fit=False): missing addresses are filled using
+    cached lat/lon and precomputed centroids from geo_meta.
     """
     df = df.copy()
 
-    # --- Load cache with deduplication ---
+    # --- Load cache ---
     lat_lon_cache = load_cache(cache_file)
 
-    # --- Optionally fetch missing via geopy ---
-    if use_geopy:
+    # --- Optional geopy lookup for training only ---
+    if fit and use_geopy:
         geolocator = Nominatim(user_agent="house_price_project")
         for addr in df["address"].unique():
             if addr not in lat_lon_cache:
@@ -121,33 +126,45 @@ def enrich_with_geolocation(
         lambda a: lat_lon_cache.get(a, (None, None))[1]
     )
 
-    # --- Postal & neighborhood centroids ---
-    df_valid = df[
-        df["address"].isin(lat_lon_cache)
-        & df["address"].map(lambda a: lat_lon_cache[a][0] is not None)
-    ]
-    postal_code_coords = (
-        df_valid.groupby("postal_code_clean")[["lat", "lon"]]
-        .mean()
-        .to_dict(orient="index")
-        if "postal_code_clean" in df.columns
-        else {}
-    )
-    neighborhood_coords = (
-        df_valid.groupby("neighborhood")[["lat", "lon"]]
-        .mean()
-        .to_dict(orient="index")
-        if "neighborhood" in df.columns
-        else {}
-    )
+    # --- Compute postal/neighborhood centroids ---
+    if fit:
+        df_valid = df[df["lat"].notna() & df["lon"].notna()]
+        postal_code_coords = (
+            df_valid.groupby("postal_code_clean")[["lat", "lon"]]
+            .mean()
+            .to_dict(orient="index")
+            if "postal_code_clean" in df.columns
+            else {}
+        )
+        neighborhood_coords = (
+            df_valid.groupby("neighborhood")[["lat", "lon"]]
+            .mean()
+            .to_dict(orient="index")
+            if "neighborhood" in df.columns
+            else {}
+        )
+        # Save centroids in geo_meta for inference
+        geo_meta = {
+            "distbin_column": "dist_to_center_bin_encoded",
+            "cache_file": cache_file,
+            "postal_code_centroids": postal_code_coords,
+            "neighborhood_centroids": neighborhood_coords,
+        }
+    else:
+        if geo_meta is None:
+            geo_meta = {}
+        postal_code_coords = geo_meta.get("postal_code_centroids", {})
+        neighborhood_coords = geo_meta.get("neighborhood_centroids", {})
 
     # --- Fill missing lat/lon ---
     lat_list, lon_list = [], []
+    CITY_CENTER = (52.3730, 4.8923)
     for _, row in df.iterrows():
         addr = row["address"]
-        if addr in lat_lon_cache and lat_lon_cache[addr][0] is not None:
-            lat, lon = lat_lon_cache[addr]
-        else:
+        lat, lon = lat_lon_cache.get(addr, (None, None))
+
+        if pd.isna(lat) or pd.isna(lon):
+            # Use fallback
             postal = row.get("postal_code_clean")
             neigh = row.get("neighborhood")
             if postal in postal_code_coords:
@@ -161,53 +178,40 @@ def enrich_with_geolocation(
                     neighborhood_coords[neigh]["lon"],
                 )
             else:
-                lat, lon = None, None
+                # Final fallback to city center
+                lat, lon = CITY_CENTER
             lat_lon_cache[addr] = (lat, lon)
+
         lat_list.append(lat)
         lon_list.append(lon)
+
     df["lat"] = lat_list
     df["lon"] = lon_list
 
-    # --- Save cache ---
-    if enable_cache_save:
+    # --- Save cache in training if requested ---
+    if fit and enable_cache_save:
         save_cache(lat_lon_cache, cache_file)
 
     # --- Missing flag ---
-    df["lat_lon_missing"] = df["lat"].isna().astype(int)
+    df["lat_lon_missing"] = df[["lat", "lon"]].isna().any(axis=1).astype(int)
 
     # --- Distance to city center ---
-    CITY_CENTER = (52.3730, 4.8923)
     df["dist_to_center_m"] = df.apply(
-        lambda r: (
-            haversine(r["lat"], r["lon"], CITY_CENTER[0], CITY_CENTER[1])
-            if pd.notna(r["lat"])
-            else -1
+        lambda r: haversine(
+            r["lat"], r["lon"], CITY_CENTER[0], CITY_CENTER[1]
         ),
         axis=1,
     )
 
-    # --- Distance bins as integers ---
+    # --- Distance bins ---
     bins = [-1, 0, 2000, 5000, 10000, 20000, np.inf]
     labels = ["missing", "0–2km", "2–5km", "5–10km", "10–20km", "20km+"]
     distbin_mapping = {label: i for i, label in enumerate(labels)}
-
     df["dist_to_center_bin_encoded"] = (
         pd.cut(df["dist_to_center_m"], bins=bins, labels=labels)
         .map(distbin_mapping)
         .astype(int)
     )
-
-    # --- Geo meta ---
-    if fit:
-        geo_meta = {
-            "distbin_column": "dist_to_center_bin_encoded",
-            "cache_file": cache_file,
-        }
-    else:
-        if "dist_to_center_bin_encoded" not in df:
-            df["dist_to_center_bin_encoded"] = 0
-
-    # Drop temporary columns we don't need
     df.drop(columns=["dist_to_center_m"], inplace=True)
 
     return df, geo_meta

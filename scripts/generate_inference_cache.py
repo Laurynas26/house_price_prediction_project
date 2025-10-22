@@ -1,6 +1,7 @@
 from pathlib import Path
 import sys
 import yaml
+import pandas as pd
 
 # -------------------- Project setup --------------------
 sys.path.append(str(Path(__file__).resolve().parents[1]))
@@ -50,3 +51,9 @@ pipeline = PreprocessingPipeline(
 pipeline.run(smart_cache=False)
 
 print(f"✅ Inference cache generated successfully at {CACHE_DIR}")
+
+# 2️⃣ Inject the geo/amenities info into meta after run
+geo_cfg = preprocessing_cfg.get("geo_feature_exp", {})
+pipeline.meta["amenities_df"] = pd.read_csv(ROOT / geo_cfg.get("amenities_file"))
+pipeline.meta["amenity_radius_map"] = geo_cfg.get("amenity_radius_map")
+pipeline.meta["geo_cache_file"] = str(ROOT / geo_cfg.get("geo_cache_file"))
