@@ -13,6 +13,19 @@ from src.api.core.manager import PipelineManager
 # This will load preprocessing/model configs, run the pipeline and load the MLflow model.
 manager = PipelineManager().initialize(config_dir="config/")
 
+# Inject geo/amenities info
+ROOT = Path(__file__).resolve().parents[1]
+import pandas as pd
+import yaml
+
+with open(ROOT / "config/preprocessing_config.yaml") as f:
+    preprocessing_cfg = yaml.safe_load(f)
+geo_cfg = preprocessing_cfg.get("geo_feature_exp", {})
+# Inject the geo/amenities info into meta after run
+manager.pipeline.meta["amenities_df"] = pd.read_csv(ROOT / geo_cfg.get("amenities_file"))
+manager.pipeline.meta["amenity_radius_map"] = geo_cfg.get("amenity_radius_map")
+manager.pipeline.meta["geo_cache_file"] = str(ROOT / geo_cfg.get("geo_cache_file"))
+
 # -------------------------
 # Option A: inline scraped JSON 
 # -------------------------
