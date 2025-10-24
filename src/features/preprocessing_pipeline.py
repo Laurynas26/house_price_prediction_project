@@ -32,7 +32,8 @@ class PipelineResult:
 
 
 class PreprocessingPipeline:
-    """Full preprocessing and feature engineering pipeline with caching support."""
+    """Full preprocessing and feature engineering pipeline
+    with caching support."""
 
     def __init__(
         self,
@@ -97,7 +98,8 @@ class PreprocessingPipeline:
                 cache_key, cfg, scope = key_info
                 if self.cache.exists(cache_key, cfg, scope=scope):
                     print(
-                        f"[SMART CACHE] Skipping {step_name}, loading cached result"
+                        f"[SMART CACHE] Skipping {step_name}, "
+                        f"loading cached result"
                     )
                     cached_data = self.cache.load(cache_key, cfg, scope=scope)
                     self._restore_from_cache(step_name, cached_data)
@@ -119,7 +121,8 @@ class PreprocessingPipeline:
                 inference_meta, "inference_meta", scope=self.model_name
             )
             print(
-                "[CACHE] Saved inference_meta for future single listing preprocessing."
+                "[CACHE] Saved inference_meta for future single listing"
+                " preprocessing."
             )
 
         return PipelineResult(
@@ -197,7 +200,6 @@ class PreprocessingPipeline:
         print("Dropped missing target rows")
 
     def feature_engineering(self):
-        model_cfg = self.config_paths.get("model", {})
         if self.load_cache and self.cache.exists(
             "feature_eng_result", self.config_paths, scope=self.model_name
         ):
@@ -251,7 +253,8 @@ class PreprocessingPipeline:
         self, listing: dict, drop_target: bool = False
     ) -> pd.DataFrame:
         """
-        Preprocess a single listing JSON dict into a model-ready feature DataFrame.
+        Preprocess a single listing JSON dict into a model-ready
+        feature DataFrame.
         Ensures schema consistency with training data.
         """
         if (
@@ -322,7 +325,8 @@ def ensure_all_categorical_columns(
     df: pd.DataFrame, meta: dict
 ) -> pd.DataFrame:
     """
-    Ensures that all one-hot encoded categorical columns seen during training exist.
+    Ensures that all one-hot encoded categorical columns seen
+    during training exist.
     Handles:
       - Facilities
       - Energy label

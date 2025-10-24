@@ -5,8 +5,6 @@ from pathlib import Path
 from datetime import datetime
 from typing import Any, Optional, Union
 
-import pandas as pd
-
 
 class CacheManager:
     """
@@ -37,7 +35,8 @@ class CacheManager:
     ) -> Optional[dict]:
         """
         Extract a sub-config by scope name (e.g., 'preprocessing' or 'model').
-        If scope is not found, returns the full config instead of raising KeyError.
+        If scope is not found, returns the full config instead
+        of raising KeyError.
         """
         if config is None:
             return None
@@ -55,7 +54,8 @@ class CacheManager:
 
     @staticmethod
     def _make_hash(config: Optional[dict]) -> Optional[str]:
-        """Generate a short deterministic hash string from a nested config dict."""
+        """Generate a short deterministic hash string from
+        a nested config dict."""
         if config is None:
             return None
         # Ensure consistent key order and hash only relevant subset
@@ -124,7 +124,8 @@ class CacheManager:
         config: Optional[dict] = None,
         scope: Optional[str] = None,
     ) -> Any:
-        """Load the most recent cache matching the given name and config subset."""
+        """Load the most recent cache matching the given name
+        and config subset."""
         subconfig = self._normalize_config(config, scope)
         hash_key = self._make_hash(subconfig)
         path = self._resolve_latest_path(name, hash_key)

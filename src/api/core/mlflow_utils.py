@@ -8,7 +8,8 @@ def load_latest_mlflow_model(
     model_name: str, experiment_name: str = "house_price_prediction"
 ):
     """
-    Load the latest MLflow run of a model by name, ignoring .trash or incomplete runs.
+    Load the latest MLflow run of a model by name,
+    ignoring .trash or incomplete runs.
 
     Args:
         model_name: str, MLflow run name of the model.
@@ -46,7 +47,8 @@ def load_latest_mlflow_model(
         )
     experiment_id = experiment.experiment_id
     print(
-        f"[MLflow] Using experiment '{experiment_name}' with ID {experiment_id}"
+        f"[MLflow] Using experiment '{experiment_name}' "
+        f"with ID {experiment_id}"
     )
 
     # --- Step 4: Get all finished runs with the correct runName ---
@@ -64,7 +66,8 @@ def load_latest_mlflow_model(
     ]
     if not valid_runs:
         raise RuntimeError(
-            f"❌ No valid MLflow runs found for runName '{model_name}' in experiment '{experiment_name}'"
+            f"❌ No valid MLflow runs found for runName '{model_name}'"
+            f"in experiment '{experiment_name}'"
         )
 
     latest_run = valid_runs[0]
