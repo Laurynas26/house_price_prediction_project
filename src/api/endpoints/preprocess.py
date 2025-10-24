@@ -8,8 +8,7 @@ manager = PipelineManager()  # shared singleton-style instance
 
 @router.post("/")
 def preprocess_single_listing(
-    listing: Dict[str, Any],
-    drop_target: bool = True
+    listing: Dict[str, Any], drop_target: bool = True
 ):
     """
     Preprocess a single listing using the fitted pipeline.
@@ -32,21 +31,20 @@ def preprocess_single_listing(
             raise HTTPException(status_code=400, detail=result.get("error"))
 
         print("✅ Preprocessing completed successfully.")
-        return result  # Already formatted as {"success": True, "features": {...}, "error": None}
-
+        return result
     except HTTPException:
-        # Already a FastAPI-friendly exception
+
         raise
 
     except Exception as e:
         # --- Diagnostic error trace ---
         import traceback
+
         print("\n--- ERROR DURING PREPROCESSING ---")
         print(f"Type: {type(e)}")
         print(f"Message: {e}")
         traceback.print_exc(limit=8)
 
         raise HTTPException(
-            status_code=500,
-            detail=f"Preprocessing failed: {e}"
+            status_code=500, detail=f"Preprocessing failed: {e}"
         )

@@ -1,7 +1,7 @@
 import glob
 import json
 import pandas as pd
-from typing import Union, List, Dict
+from typing import Union, List
 
 
 def load_data_from_json(path_pattern: str) -> pd.DataFrame:
@@ -38,7 +38,8 @@ def json_to_df_raw_strict(
     source: Union[str, dict, List[dict]], verbose: bool = False
 ) -> pd.DataFrame:
     """
-    Load one or many raw property JSONs into a normalized, schema-safe DataFrame.
+    Load one or many raw property JSONs into a normalized,
+    schema-safe DataFrame.
 
     Designed for perfect compatibility with `preprocess_df()`, including:
     - Type normalization for nested structures
@@ -107,7 +108,8 @@ def json_to_df_raw_strict(
             if not isinstance(val, allowed_types):
                 if verbose:
                     print(
-                        f"[json_to_df_raw_strict] Warning: '{key}' has invalid type {type(val)} in record {i}"
+                        f"[json_to_df_raw_strict] Warning: '{key}' "
+                        f"has invalid type {type(val)} in record {i}"
                     )
                 val = default
 
