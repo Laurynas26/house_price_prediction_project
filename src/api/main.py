@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from src.api.endpoints import scrape, preprocess, predict, full_pipeline
+from src.api.endpoints import scrape, preprocess
 from src.api.core.manager import PipelineManager
 
 manager = PipelineManager()
@@ -34,7 +34,9 @@ app.include_router(
     preprocess.router, prefix="/preprocess", tags=["Preprocessing"]
 )
 # app.include_router(predict.router, prefix="/predict", tags=["Prediction"])
-# app.include_router(full_pipeline.router, prefix="/pipeline", tags=["Full Pipeline"])
+# app.include_router(
+#     full_pipeline.router, prefix="/pipeline", tags=["Full Pipeline"]
+# )
 
 
 # ----------------------------------------

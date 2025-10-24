@@ -37,7 +37,7 @@ def scrape_listing(
         results = scraper.run()
 
         # Log each field for debugging
-        logging.info(f"[DEBUG] Scraper raw results:")
+        logging.info("[DEBUG] Scraper raw results:")
         for k, v in results.items():
             logging.info(f"    {k}: {v}")
 
