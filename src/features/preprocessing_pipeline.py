@@ -314,6 +314,8 @@ class PreprocessingPipeline:
 
         # --- Reindex to exactly match training columns ---
         df = df.reindex(columns=self.expected_columns, fill_value=0)
+    
+        return df
 
 
 # -------------------------------------------------------------------------
