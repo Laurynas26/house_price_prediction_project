@@ -296,6 +296,9 @@ class PreprocessingPipeline:
                 df[col] = 0 if col.startswith("has_") else pd.NA
         df = df.reindex(columns=self.expected_columns)
 
+        if "postal_code_clean" in df.columns:
+            df = df.drop(columns=["postal_code_clean"])
+
         if drop_target:
             df = df.drop(columns=["price", "price_num"], errors="ignore")
 
