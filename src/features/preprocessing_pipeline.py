@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Dict, Any
 import pandas as pd
+import numpy as np
 
 from src.data_loading.data_loading.data_loader import (
     load_data_from_json,
@@ -299,7 +300,21 @@ class PreprocessingPipeline:
         if drop_target:
             df = df.drop(columns=["price", "price_num"], errors="ignore")
 
-        print(f"[Preprocess Single] Aligned to {len(df.columns)} features.")
+        # --- Drop unwanted features that exist in test but not in training ---
+        for col in ["log_nr_rooms", "log_bathrooms", "log_toilets", "lat", "lon", "postal_code_clean"]:
+            if col in df.columns:
+                df.drop(columns=col, inplace=True)
+
+        # --- Compute missing log features if they are not present ---
+        if "log_size_num" not in df.columns and "size_num" in df.columns:
+            df["log_size_num"] = np.log1p(df["size_num"].astype(float))
+
+        if "log_num_facilities" not in df.columns and "num_facilities" in df.columns:
+            df["log_num_facilities"] = np.log1p(df["num_facilities"].astype(float))
+
+        # --- Reindex to exactly match training columns ---
+        df = df.reindex(columns=self.expected_columns, fill_value=0)
+    
         return df
 
 
