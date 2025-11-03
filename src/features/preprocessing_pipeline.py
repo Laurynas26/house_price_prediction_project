@@ -300,21 +300,41 @@ class PreprocessingPipeline:
         if drop_target:
             df = df.drop(columns=["price", "price_num"], errors="ignore")
 
-        # --- Drop unwanted features that exist in test but not in training ---
-        for col in ["log_nr_rooms", "log_bathrooms", "log_toilets", "lat", "lon", "postal_code_clean"]:
-            if col in df.columns:
-                df.drop(columns=col, inplace=True)
+        # --- Drop features that never existed in training ---
+        extra_cols = [c for c in df.columns if c not in self.expected_columns]
+        if extra_cols:
+            print(
+                f"[INFO] Dropping {len(extra_cols)} extra cols not seen in training: {extra_cols[:10]}..."
+            )
+            df.drop(columns=extra_cols, inplace=True, errors="ignore")
 
         # --- Compute missing log features if they are not present ---
-        if "log_size_num" not in df.columns and "size_num" in df.columns:
-            df["log_size_num"] = np.log1p(df["size_num"].astype(float))
+        for log_col, base_col in [
+            ("log_size_num", "size_num"),
+            ("log_num_facilities", "num_facilities"),
+        ]:
+            if log_col not in df.columns and base_col in df.columns:
+                df[log_col] = np.log1p(df[base_col].fillna(0).astype(float))
 
-        if "log_num_facilities" not in df.columns and "num_facilities" in df.columns:
-            df["log_num_facilities"] = np.log1p(df["num_facilities"].astype(float))
+        # --- Ensure all training columns exist ---
+        missing_cols = [
+            c for c in self.expected_columns if c not in df.columns
+        ]
+        for col in missing_cols:
+            df[col] = 0 if col.startswith("has_") else pd.NA
 
-        # --- Reindex to exactly match training columns ---
+        # --- Final reindex (strict column order match) ---
         df = df.reindex(columns=self.expected_columns, fill_value=0)
-    
+
+        # Drop target if required
+        if drop_target:
+            df = df.drop(columns=["price", "price_num"], errors="ignore")
+
+        # --- Drop postal_code_clean if it survived (string dtype not used by model) ---
+        if "postal_code_clean" in df.columns:
+            df.drop(columns=["postal_code_clean"], inplace=True)
+
+
         return df
 
 
