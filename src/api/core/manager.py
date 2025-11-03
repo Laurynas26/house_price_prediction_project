@@ -191,7 +191,8 @@ class PipelineManager:
     # -------------------------------------------------------------------------
     def predict(self, features: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Predict price from preprocessed features (dict aligned with training columns).
+        Predict price from preprocessed features
+        (dict aligned with training columns).
 
         Returns:
         {
@@ -215,9 +216,11 @@ class PipelineManager:
             model_features = (
                 self.model.feature_names
                 if hasattr(self.model, "feature_names")
-                else self.model.get_attr("feature_names")
-                if hasattr(self.model, "get_attr")
-                else None
+                else (
+                    self.model.get_attr("feature_names")
+                    if hasattr(self.model, "get_attr")
+                    else None
+                )
             )
 
             if model_features is None:
@@ -232,12 +235,18 @@ class PipelineManager:
                 print(f"[DEBUG] Missing in input: {missing}")
                 print(f"[DEBUG] Extra in input: {extra}")
 
-            features_df = features_df.reindex(columns=model_features, fill_value=0)
+            features_df = features_df.reindex(
+                columns=model_features, fill_value=0
+            )
 
             # --- Drop any non-numeric columns ---
-            non_numeric = features_df.select_dtypes(exclude=["number", "bool"]).columns
+            non_numeric = features_df.select_dtypes(
+                exclude=["number", "bool"]
+            ).columns
             if len(non_numeric) > 0:
-                print(f"[INFO] Dropping non-numeric columns before prediction: {list(non_numeric)}")
+                print(
+                    f"[INFO] Dropping non-numeric columns before prediction: {list(non_numeric)}"
+                )
                 features_df = features_df.drop(columns=non_numeric)
 
             # --- Run prediction ---
@@ -245,8 +254,7 @@ class PipelineManager:
             raw_pred = float(self.model.predict(dmatrix)[0])
 
             # Undo log-transform if applicable
-            pred_value = np.expm1(raw_pred) 
-
+            pred_value = np.expm1(raw_pred)
 
             return {
                 "success": True,
@@ -263,34 +271,83 @@ class PipelineManager:
                 "error": str(e),
             }
 
+    def convert_data_from_manual_input(
+        self, user_input: dict
+    ) -> pd.DataFrame:
+        """
+        Convert manual user input into a full feature DataFrame
+        aligned with training columns.
+        """
+        df = pd.DataFrame([user_input])
+
+        # Fill missing expected columns
+        for col in self.pipeline.expected_columns:
+            if col not in df.columns:
+                df[col] = 0 if col.startswith("has_") else 0.0
+
+        # Compute log features
+        for log_col, base_col in [
+            ("log_size_num", "size_num"),
+            ("log_num_facilities", "num_facilities"),
+        ]:
+            if log_col not in df.columns and base_col in df.columns:
+                df[log_col] = np.log1p(df[base_col].fillna(0))
+
+        # Final column order match
+        df = df.reindex(columns=self.pipeline.expected_columns, fill_value=0)
+        return df
 
     # -------------------------------------------------------------------------
     # Full pipeline
     # -------------------------------------------------------------------------
     def run_full_pipeline(
-        self, url: str, headless: bool = True
+        self, url: str = None, manual_input: dict = None, headless: bool = True
     ) -> Dict[str, Any]:
         """
-        Full end-to-end: scrape → preprocess → predict.
+        Full end-to-end: scrape → preprocess → predict OR manual input → predict.
+
+        Args:
+            url: Funda URL to scrape.
+            manual_input: dict with user-provided features.
+            headless: headless mode for scraping.
+
+        Returns:
+            dict with prediction and features.
         """
         if not self._initialized:
             raise RuntimeError("PipelineManager not initialized.")
 
-        # Step 1: Scrape
-        scrape_result = self.scrape(url, headless=headless)
-        if not scrape_result["success"]:
-            return scrape_result
+        # --- Decide data source ---
+        if url:
+            scrape_result = self.scrape(url, headless=headless)
+            if not scrape_result["success"]:
+                return scrape_result
+            listing = scrape_result["data"]
+            preprocess_result = self.preprocess(listing, drop_target=True)
+            if not preprocess_result["success"]:
+                return preprocess_result
+            features = preprocess_result["features"]
 
-        listing = scrape_result["data"]
+        elif manual_input:
+            # Step 1: transform input
+            df_manual = self.convert_data_from_manual_input(manual_input)
+            
+            # Step 2: full preprocessing
+            preprocess_result = self.preprocess(df_manual.iloc[0].to_dict(), drop_target=True)
+            if not preprocess_result["success"]:
+                return preprocess_result
+            
+            # Step 3: predict
+            features = preprocess_result["features"]
 
-        # Step 2: Preprocess
-        preprocess_result = self.preprocess(listing, drop_target=True)
-        if not preprocess_result["success"]:
-            return preprocess_result
+        else:
+            return {
+                "success": False,
+                "prediction": None,
+                "features": None,
+                "error": "Either 'url' or 'manual_input' must be provided.",
+            }
 
-        features = preprocess_result["features"]
-
-        # Step 3: Predict
+        # --- Predict ---
         prediction_result = self.predict(features)
-
-        return {**prediction_result, "url": url}
+        return prediction_result
