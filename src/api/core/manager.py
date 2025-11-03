@@ -3,6 +3,7 @@ from typing import Dict, Any
 import yaml
 import xgboost as xgb
 import pandas as pd
+import numpy as np
 
 from src.scraper.core import scrape_listing
 from src.features.preprocessing_pipeline import PreprocessingPipeline
@@ -178,20 +179,20 @@ class PipelineManager:
 
         except Exception as e:
             import traceback
+
             print("\n--- ERROR INSIDE manager.preprocess ---")
             print(f"Type: {type(e)}")
             print(f"Message: {e}")
             traceback.print_exc(limit=10)
             return {"success": False, "features": None, "error": str(e)}
 
-
     # -------------------------------------------------------------------------
     # Prediction
     # -------------------------------------------------------------------------
     def predict(self, features: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Predict price from preprocessed features (dict aligned
-        with training columns).
+        Predict price from preprocessed features (dict aligned with training columns).
+
         Returns:
         {
             "success": bool,
@@ -210,13 +211,47 @@ class PipelineManager:
             else:
                 features_df = pd.DataFrame(features)
 
+            # --- Get model feature names ---
+            model_features = (
+                self.model.feature_names
+                if hasattr(self.model, "feature_names")
+                else self.model.get_attr("feature_names")
+                if hasattr(self.model, "get_attr")
+                else None
+            )
+
+            if model_features is None:
+                raise ValueError("Cannot extract feature names from model.")
+
+            # --- Align columns ---
+            df_features = features_df.columns.tolist()
+            missing = [f for f in model_features if f not in df_features]
+            extra = [f for f in df_features if f not in model_features]
+
+            if missing or extra:
+                print(f"[DEBUG] Missing in input: {missing}")
+                print(f"[DEBUG] Extra in input: {extra}")
+
+            features_df = features_df.reindex(columns=model_features, fill_value=0)
+
+            # --- Drop any non-numeric columns ---
+            non_numeric = features_df.select_dtypes(exclude=["number", "bool"]).columns
+            if len(non_numeric) > 0:
+                print(f"[INFO] Dropping non-numeric columns before prediction: {list(non_numeric)}")
+                features_df = features_df.drop(columns=non_numeric)
+
+            # --- Run prediction ---
             dmatrix = xgb.DMatrix(features_df)
-            pred_value = float(self.model.predict(dmatrix)[0])
+            raw_pred = float(self.model.predict(dmatrix)[0])
+
+            # Undo log-transform if applicable
+            pred_value = np.expm1(raw_pred) 
+
 
             return {
                 "success": True,
                 "prediction": pred_value,
-                "features": features,
+                "features": features_df.to_dict(orient="records")[0],
                 "error": None,
             }
 
@@ -227,6 +262,7 @@ class PipelineManager:
                 "features": None,
                 "error": str(e),
             }
+
 
     # -------------------------------------------------------------------------
     # Full pipeline
