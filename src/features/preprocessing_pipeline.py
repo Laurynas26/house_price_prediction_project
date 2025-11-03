@@ -330,7 +330,7 @@ class PreprocessingPipeline:
         if drop_target:
             df = df.drop(columns=["price", "price_num"], errors="ignore")
 
-        # --- Drop postal_code_clean if it survived (string dtype not used by model) ---
+        # --- Drop postal_code_clean if it survived ---
         if "postal_code_clean" in df.columns:
             df.drop(columns=["postal_code_clean"], inplace=True)
 
