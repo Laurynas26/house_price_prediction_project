@@ -304,7 +304,8 @@ class PreprocessingPipeline:
         extra_cols = [c for c in df.columns if c not in self.expected_columns]
         if extra_cols:
             print(
-                f"[INFO] Dropping {len(extra_cols)} extra cols not seen in training: {extra_cols[:10]}..."
+                f"[INFO] Dropping {len(extra_cols)} extra cols "
+                f"not seen in training: {extra_cols[:10]}..."
             )
             df.drop(columns=extra_cols, inplace=True, errors="ignore")
 
