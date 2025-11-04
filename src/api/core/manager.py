@@ -245,7 +245,8 @@ class PipelineManager:
             ).columns
             if len(non_numeric) > 0:
                 print(
-                    f"[INFO] Dropping non-numeric columns before prediction: {list(non_numeric)}"
+                    f"[INFO] Dropping non-numeric columns before "
+                    f"prediction: {list(non_numeric)}"
                 )
                 features_df = features_df.drop(columns=non_numeric)
 
@@ -271,9 +272,7 @@ class PipelineManager:
                 "error": str(e),
             }
 
-    def convert_data_from_manual_input(
-        self, user_input: dict
-    ) -> pd.DataFrame:
+    def convert_data_from_manual_input(self, user_input: dict) -> pd.DataFrame:
         """
         Convert manual user input into a full feature DataFrame
         aligned with training columns.
@@ -304,7 +303,8 @@ class PipelineManager:
         self, url: str = None, manual_input: dict = None, headless: bool = True
     ) -> Dict[str, Any]:
         """
-        Full end-to-end: scrape → preprocess → predict OR manual input → predict.
+        Full end-to-end: scrape → preprocess → predict OR
+        manual input → predict.
 
         Args:
             url: Funda URL to scrape.
@@ -331,12 +331,14 @@ class PipelineManager:
         elif manual_input:
             # Step 1: transform input
             df_manual = self.convert_data_from_manual_input(manual_input)
-            
+
             # Step 2: full preprocessing
-            preprocess_result = self.preprocess(df_manual.iloc[0].to_dict(), drop_target=True)
+            preprocess_result = self.preprocess(
+                df_manual.iloc[0].to_dict(), drop_target=True
+            )
             if not preprocess_result["success"]:
                 return preprocess_result
-            
+
             # Step 3: predict
             features = preprocess_result["features"]
 
