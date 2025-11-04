@@ -12,19 +12,26 @@ def preprocess_single_listing(
 ):
     """
     Preprocess a single listing using the fitted pipeline.
-    Returns the feature vector aligned with the model training features.
+    Accepts either:
+    - raw listing dict
+    - or scrape response: {"url": ..., "success": True, "data": {...},
+    "error": None}
     """
     try:
+        # --- Handle wrapped scrape response ---
+        if "data" in listing and isinstance(listing["data"], dict):
+            listing_to_process = listing["data"]
+        else:
+            listing_to_process = listing
+
         # --- Optional diagnostic logging ---
         print("\n=== Incoming /preprocess request ===")
-        print(f"Incoming listing keys: {list(listing.keys())}")
-
-        # If nested, print subkeys for clarity
-        if isinstance(listing.get("data"), dict):
-            print(f"Subkeys under 'data': {list(listing['data'].keys())}")
+        print(f"Listing keys: {list(listing_to_process.keys())}")
 
         # --- Run pipeline preprocessing ---
-        result = manager.preprocess(listing, drop_target=drop_target)
+        result = manager.preprocess(
+            listing_to_process, drop_target=drop_target
+        )
 
         # --- Validation: manager-level error ---
         if not result.get("success", False):
@@ -32,19 +39,17 @@ def preprocess_single_listing(
 
         print("✅ Preprocessing completed successfully.")
         return result
-    except HTTPException:
 
+    except HTTPException:
         raise
 
     except Exception as e:
-        # --- Diagnostic error trace ---
         import traceback
 
         print("\n--- ERROR DURING PREPROCESSING ---")
         print(f"Type: {type(e)}")
         print(f"Message: {e}")
         traceback.print_exc(limit=8)
-
         raise HTTPException(
             status_code=500, detail=f"Preprocessing failed: {e}"
         )
