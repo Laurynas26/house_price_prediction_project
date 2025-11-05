@@ -6,46 +6,64 @@ manager = PipelineManager()
 
 
 @router.post("/")
-def run_full_pipeline(
-    url: str = Query(..., description="Funda listing URL to scrape and predict"),
+def full_pipeline(
+    url: str = Query(..., description="Funda listing URL"),
     headless: bool = True,
 ):
     """
-    Run the full pipeline in explicit steps:
-    1. Scrape the Funda listing
-    2. Preprocess the scraped listing
-    3. Predict price using aligned features
+    Run the full pipeline:
+    1. Scrape the listing
+    2. Preprocess the scraped data
+    3. Predict price from features
+    Returns a dict with success, features, and prediction.
     """
     if not manager._initialized:
-        raise HTTPException(status_code=500, detail="PipelineManager not initialized")
+        raise HTTPException(
+            status_code=500, detail="PipelineManager not initialized"
+        )
 
     try:
-        # 1️⃣ Scrape
-        scrape_result = manager.scrape(url, headless=headless)
-        if not scrape_result["success"]:
-            raise HTTPException(status_code=400, detail=scrape_result["error"])
+        # --- Scrape ---
+        scrape_result = manager.scrape(url, headless=False)
+        if not scrape_result.get("success", False):
+            return {
+                "success": False,
+                "error": f"Scrape failed: {scrape_result.get('error')}",
+            }
 
-        listing_data = scrape_result["data"]
+        listing_data = scrape_result.get("data")
+        if listing_data is None:
+            return {"success": False, "error": "Scrape returned no data"}
 
-        # 2️⃣ Preprocess
+        # --- Preprocess ---
         preprocess_result = manager.preprocess(listing_data, drop_target=True)
-        if not preprocess_result["success"]:
-            raise HTTPException(status_code=400, detail=preprocess_result["error"])
+        if not preprocess_result.get("success", False):
+            return {
+                "success": False,
+                "error": f"Preprocess failed: {preprocess_result.get('error')}",
+            }
 
-        features = preprocess_result["features"]
+        features = preprocess_result.get("features")
+        if features is None:
+            return {
+                "success": False,
+                "error": "Preprocess returned no features",
+            }
 
-        # 3️⃣ Predict
-        prediction_result = manager.predict(listing_data)  # Predict expects raw listing internally
-        if not prediction_result["success"]:
-            raise HTTPException(status_code=400, detail=prediction_result["error"])
+        # --- Predict ---
+        prediction_result = manager.predict(features)
+        if not prediction_result.get("success", False):
+            return {
+                "success": False,
+                "error": f"Prediction failed: {prediction_result.get('error')}",
+            }
 
         return {
+            "success": True,
             "url": url,
             "features": features,
-            "prediction": prediction_result["prediction"],
+            "prediction": prediction_result.get("prediction"),
         }
 
-    except HTTPException:
-        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Full pipeline failed: {e}")
+        return {"success": False, "error": f"Full pipeline failed: {e}"}
