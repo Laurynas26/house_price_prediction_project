@@ -1,8 +1,14 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from src.api.endpoints import scrape, preprocess
+from src.api.endpoints import scrape, preprocess, predict, full_pipeline
 from src.api.core.manager import PipelineManager
+from pathlib import Path
+import pandas as pd
+import yaml
 
+# ----------------------------------------
+# Shared global instance
+# ----------------------------------------
 manager = PipelineManager()
 
 
@@ -12,8 +18,23 @@ manager = PipelineManager()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: initialize the pipeline manager
-    PipelineManager().initialize(config_dir="config/")
-    print("[Startup] PipelineManager initialized.")
+    manager.initialize(config_dir="config/")
+    # Load and inject amenities and geo metadata
+    ROOT = Path(__file__).resolve().parents[2]  # adjust if needed
+    with open(ROOT / "config/preprocessing_config.yaml") as f:
+        preprocessing_cfg = yaml.safe_load(f)
+
+    geo_cfg = preprocessing_cfg.get("geo_feature_exp", {})
+    manager.pipeline.meta["amenities_df"] = pd.read_csv(
+        ROOT / geo_cfg.get("amenities_file")
+    )
+    manager.pipeline.meta["amenity_radius_map"] = geo_cfg.get(
+        "amenity_radius_map"
+    )
+    manager.pipeline.meta["geo_cache_file"] = str(
+        ROOT / geo_cfg.get("geo_cache_file")
+    )
+    print("[Startup] PipelineManager and amenities loaded successfully.")
     yield
     # Shutdown: optional cleanup
     print("[Shutdown] API shutting down.")
@@ -33,10 +54,10 @@ app.include_router(scrape.router, prefix="/scrape", tags=["Scraping"])
 app.include_router(
     preprocess.router, prefix="/preprocess", tags=["Preprocessing"]
 )
-# app.include_router(predict.router, prefix="/predict", tags=["Prediction"])
-# app.include_router(
-#     full_pipeline.router, prefix="/pipeline", tags=["Full Pipeline"]
-# )
+app.include_router(predict.router, prefix="/predict", tags=["Prediction"])
+app.include_router(
+    full_pipeline.router, prefix="/pipeline", tags=["Full Pipeline"]
+)
 
 
 # ----------------------------------------
