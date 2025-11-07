@@ -3,6 +3,53 @@ import json
 import pandas as pd
 from typing import Union, List
 
+import boto3
+from io import BytesIO
+
+
+# ----------------------------
+# S3 Utility Functions
+# ----------------------------
+def list_s3_files(bucket_name: str, prefix: str) -> List[str]:
+    """
+    List all files in an S3 bucket under a given prefix.
+    """
+    s3 = boto3.client("s3")
+    resp = s3.list_objects_v2(Bucket=bucket_name, Prefix=prefix)
+    if "Contents" not in resp:
+        return []
+    return [
+        obj["Key"] for obj in resp["Contents"] if not obj["Key"].endswith("/")
+    ]
+
+
+def load_json_from_s3(bucket_name: str, key: str) -> dict:
+    """
+    Load a single JSON file from S3 into a Python dict.
+    """
+    s3 = boto3.client("s3")
+    obj = s3.get_object(Bucket=bucket_name, Key=key)
+    return json.load(BytesIO(obj["Body"].read()))
+
+
+def load_data_from_s3_json(bucket_name: str, prefix: str) -> pd.DataFrame:
+    """
+    Load all JSON files under a given S3 prefix into a DataFrame.
+    """
+    keys = list_s3_files(bucket_name, prefix)
+    if not keys:
+        return pd.DataFrame()  # empty bucket/prefix
+
+    data_list = [load_json_from_s3(bucket_name, key) for key in keys]
+
+    # Feed into your strict loader
+    return pd.DataFrame(data_list)
+
+
+# ----------------------------
+# Local JSON Loading
+# ----------------------------
+
 
 def load_data_from_json(path_pattern: str) -> pd.DataFrame:
     """
@@ -34,6 +81,9 @@ def load_data_from_json(path_pattern: str) -> pd.DataFrame:
     return pd.DataFrame(data_list)
 
 
+# ----------------------------
+# Schema-Safe Loader
+# ----------------------------
 def json_to_df_raw_strict(
     source: Union[str, dict, List[dict]], verbose: bool = False
 ) -> pd.DataFrame:
