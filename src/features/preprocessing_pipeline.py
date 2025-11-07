@@ -7,7 +7,9 @@ import numpy as np
 from src.data_loading.data_loading.data_loader import (
     load_data_from_json,
     json_to_df_raw_strict,
+    load_data_from_s3_json,
 )
+
 from src.data_loading.preprocessing.preprocessing import preprocess_df
 from src.data_loading.preprocessing.imputation import impute_missing_values
 from src.features.data_prep_for_modelling.data_preparation import (
@@ -45,6 +47,9 @@ class PreprocessingPipeline:
         cache_dir: str = "data/cache",
         model_config_path: Optional[Path] = None,
         model_name: str = None,
+        use_s3: bool = False,
+        s3_bucket: str = None,
+        s3_prefix: str = None,
     ):
         self.config_paths = config_paths
         self.raw_json_pattern = raw_json_pattern
@@ -62,6 +67,10 @@ class PreprocessingPipeline:
         self.scaler = None
         self.meta = {}
         self.expected_columns = []
+
+        self.use_s3 = use_s3
+        self.s3_bucket = s3_bucket
+        self.s3_prefix = s3_prefix
 
         # Pipeline steps
         self.steps = [
@@ -162,7 +171,15 @@ class PreprocessingPipeline:
         if self.load_cache and self.cache.exists("df_raw", config=None):
             self.df_raw = self.cache.load("df_raw")
         else:
-            self.df_raw = load_data_from_json(self.raw_json_pattern)
+            if self.use_s3:
+                # Cloud loading
+                self.df_raw = load_data_from_s3_json(
+                    self.s3_bucket, self.s3_prefix
+                )
+            else:
+                # Local loading
+                self.df_raw = load_data_from_json(self.raw_json_pattern)
+
             print(f"Loaded {len(self.df_raw)} raw listings")
             if self.save_cache:
                 self.cache.save(self.df_raw, "df_raw")
@@ -334,7 +351,6 @@ class PreprocessingPipeline:
         # --- Drop postal_code_clean if it survived ---
         if "postal_code_clean" in df.columns:
             df.drop(columns=["postal_code_clean"], inplace=True)
-
 
         return df
 

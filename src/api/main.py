@@ -20,7 +20,7 @@ async def lifespan(app: FastAPI):
     # Startup: initialize the pipeline manager
     manager.initialize(config_dir="config/")
     # Load and inject amenities and geo metadata
-    ROOT = Path(__file__).resolve().parents[2]  # adjust if needed
+    ROOT = Path(__file__).resolve().parents[2]  
     with open(ROOT / "config/preprocessing_config.yaml") as f:
         preprocessing_cfg = yaml.safe_load(f)
 

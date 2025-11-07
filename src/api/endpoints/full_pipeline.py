@@ -24,7 +24,7 @@ def full_pipeline(
 
     try:
         # --- Scrape ---
-        scrape_result = manager.scrape(url, headless=False)
+        scrape_result = manager.scrape(url, headless=headless)
         if not scrape_result.get("success", False):
             return {
                 "success": False,
