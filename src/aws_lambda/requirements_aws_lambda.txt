@@ -14,7 +14,7 @@ mlflow>=2.9
 
 # Web scraping
 requests>=2.31
-selenium>=5.6
+selenium==4.12.0
 beautifulsoup4>=4.12
 webdriver-manager>=3.9
 lxml>=4.9
