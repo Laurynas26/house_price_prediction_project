@@ -2,14 +2,14 @@
 FROM public.ecr.aws/lambda/python:3.10
 
 # Copy Lambda function code
-COPY aws_lambda/ ${LAMBDA_TASK_ROOT}/
+COPY src/aws_lambda/ ${LAMBDA_TASK_ROOT}/
 
 # Copy src and config
 COPY src/ ${LAMBDA_TASK_ROOT}/src/
 COPY config/ ${LAMBDA_TASK_ROOT}/config/
 
 # Install dependencies
-COPY aws_lambda/requirements_aws_lambda.txt .
+COPY src/aws_lambda/requirements_aws_lambda.txt .
 RUN pip install --no-cache-dir -r requirements_aws_lambda.txt
 
 # Set the Lambda handler (file.function)
