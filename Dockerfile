@@ -1,19 +1,17 @@
 # Base AWS Lambda Python 3.10 image
 FROM public.ecr.aws/lambda/python:3.10
 
-# Install build tools (needed for xgboost and similar libs)
-RUN yum install -y gcc g++ cmake make
+# Set working directory
+WORKDIR ${LAMBDA_TASK_ROOT}
 
-# Copy Lambda function code
+# Copy your function code and supporting files
 COPY src/aws_lambda/ ${LAMBDA_TASK_ROOT}/
-
-# Copy src and config
 COPY src/ ${LAMBDA_TASK_ROOT}/src/
 COPY config/ ${LAMBDA_TASK_ROOT}/config/
 
-# Install dependencies
-COPY src/aws_lambda/requirements_aws_lambda.txt .
-RUN pip install --no-cache-dir -r requirements_aws_lambda.txt
+# Install Python dependencies directly (no CMake, no build tools)
+# Use prebuilt wheel for xgboost (2.0.3) to avoid compilation
+RUN pip install --no-cache-dir pandas numpy pyyaml xgboost==2.0.3
 
 # Set the Lambda handler (file.function)
 CMD ["lambda_function.lambda_handler"]
