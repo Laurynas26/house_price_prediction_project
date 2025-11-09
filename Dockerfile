@@ -9,8 +9,8 @@ COPY src/ ${LAMBDA_TASK_ROOT}/src/
 COPY config/ ${LAMBDA_TASK_ROOT}/config/
 
 # Install dependencies
-COPY aws_lambda/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY aws_lambda/requirements_aws_lambda.txt .
+RUN pip install --no-cache-dir -r requirements_aws_lambda.txt
 
 # Set the Lambda handler (file.function)
 CMD ["lambda_function.lambda_handler"]
