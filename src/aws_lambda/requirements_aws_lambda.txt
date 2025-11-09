@@ -1,0 +1,6 @@
+pandas
+numpy
+pyyaml
+xgboost
+mlflow
+boto3
