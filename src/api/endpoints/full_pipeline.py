@@ -40,7 +40,8 @@ def full_pipeline(
         if not preprocess_result.get("success", False):
             return {
                 "success": False,
-                "error": f"Preprocess failed: {preprocess_result.get('error')}",
+                "error": f"Preprocess failed: " 
+                f"{preprocess_result.get('error')}",
             }
 
         features = preprocess_result.get("features")
@@ -55,7 +56,8 @@ def full_pipeline(
         if not prediction_result.get("success", False):
             return {
                 "success": False,
-                "error": f"Prediction failed: {prediction_result.get('error')}",
+                "error": f"Prediction failed: "
+                f"{prediction_result.get('error')}",
             }
 
         return {
