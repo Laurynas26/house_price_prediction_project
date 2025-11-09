@@ -33,7 +33,6 @@ RUN yum -y update && \
         cups-libs \
         pango \
         GConf2 \
-        atk \
         gtk2 \
         gtk3 \
         libgdk-pixbuf2.0-0 \
@@ -52,7 +51,8 @@ COPY config/ ${LAMBDA_TASK_ROOT}/config/
 
 # Copy and install Python dependencies
 COPY src/aws_lambda/requirements_aws_lambda.txt .
-RUN pip install --no-cache-dir -r requirements_aws_lambda.txt
+RUN pip install --upgrade pip \
+    && pip install --no-cache-dir -r requirements_aws_lambda.txt
 
 # Set environment variables for headless Chromium
 ENV PATH="/usr/bin/chromium:${PATH}"
