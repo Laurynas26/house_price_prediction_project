@@ -1,6 +1,9 @@
 # Base AWS Lambda Python 3.10 image
 FROM public.ecr.aws/lambda/python:3.10
 
+# Install build tools (needed for xgboost and similar libs)
+RUN yum install -y gcc g++ cmake make
+
 # Copy Lambda function code
 COPY src/aws_lambda/ ${LAMBDA_TASK_ROOT}/
 
