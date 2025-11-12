@@ -61,8 +61,8 @@ COPY src/aws_lambda/requirements_aws_lambda.txt .
 
 # Ensure we install a compatible NumPy and add webdriver-manager
 RUN pip install --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir -r requirements_aws_lambda.txt && \
-    pip install --no-cache-dir "numpy<2" "webdriver-manager==4.0.2"
+    pip install --no-cache-dir "numpy<2" -r requirements_aws_lambda.txt
+
 
 # -----------------------------
 # Set environment variables for headless Chromium
