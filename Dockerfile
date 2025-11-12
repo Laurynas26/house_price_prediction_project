@@ -1,7 +1,9 @@
 # Base AWS Lambda Python 3.10 image
 FROM public.ecr.aws/lambda/python:3.10
 
-# Install dependencies for Chromium and Selenium
+# -----------------------------
+# Install system dependencies for Chromium and Selenium
+# -----------------------------
 RUN yum -y update && \
     yum install -y \
         chromium \
@@ -35,28 +37,40 @@ RUN yum -y update && \
         GConf2 \
         gtk2 \
         gtk3 \
-        libgdk-pixbuf2.0-0 \
         libxkbfile \
         mesa-libOSMesa \
         xdg-utils \
     && yum clean all
 
+# -----------------------------
 # Set working directory
+# -----------------------------
 WORKDIR ${LAMBDA_TASK_ROOT}
 
-# Copy Lambda function code and config
+# -----------------------------
+# Copy code and configuration
+# -----------------------------
 COPY src/aws_lambda/ ${LAMBDA_TASK_ROOT}/
 COPY src/ ${LAMBDA_TASK_ROOT}/src/
 COPY config/ ${LAMBDA_TASK_ROOT}/config/
 
-# Copy and install Python dependencies
+# -----------------------------
+# Install Python dependencies
+# -----------------------------
 COPY src/aws_lambda/requirements_aws_lambda.txt .
-RUN pip install --upgrade pip \
-    && pip install --no-cache-dir -r requirements_aws_lambda.txt
 
+# Ensure we install a compatible NumPy and add webdriver-manager
+RUN pip install --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir -r requirements_aws_lambda.txt && \
+    pip install --no-cache-dir "numpy<2" "webdriver-manager==4.0.2"
+
+# -----------------------------
 # Set environment variables for headless Chromium
+# -----------------------------
 ENV PATH="/usr/bin/chromium:${PATH}"
 ENV CHROME_BIN="/usr/bin/chromium"
 
+# -----------------------------
 # Lambda handler
+# -----------------------------
 CMD ["lambda_function.lambda_handler"]
