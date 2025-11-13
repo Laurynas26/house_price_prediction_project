@@ -2,31 +2,42 @@ import json
 from pathlib import Path
 import pandas as pd
 import yaml
+import os
 
 from src.api.core.manager import PipelineManager
 
 # --- Cold-start singleton: keep manager in memory ---
 manager = PipelineManager()
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(os.environ["LAMBDA_TASK_ROOT"])
+CONFIG_DIR = ROOT / "config"
 
-# Initialize on cold start
-with open(ROOT / "config/preprocessing_config.yaml") as f:
+# Load preprocessing config once
+with open(CONFIG_DIR / "preprocessing_config.yaml") as f:
     preprocessing_cfg = yaml.safe_load(f)
 geo_cfg = preprocessing_cfg.get("geo_feature_exp", {})
 
-manager.initialize(config_dir=str(ROOT / "config"))
-manager.pipeline.meta["amenities_df"] = pd.read_csv(
-    ROOT / geo_cfg.get("amenities_file")
-)
-manager.pipeline.meta["amenity_radius_map"] = geo_cfg.get("amenity_radius_map")
-manager.pipeline.meta["geo_cache_file"] = str(ROOT / geo_cfg.get("geo_cache_file"))
 
-print("[Lambda] PipelineManager initialized")
+def initialize_pipeline():
+    """
+    Initialize the pipeline on first request (lazy load).
+    Avoids long cold-start during Lambda init.
+    """
+    if getattr(manager, "pipeline_initialized", False):
+        return
+
+    manager.initialize(config_dir=str(CONFIG_DIR))
+    manager.pipeline.meta["amenities_df"] = pd.read_csv(
+        CONFIG_DIR / geo_cfg.get("amenities_file")
+    )
+    manager.pipeline.meta["amenity_radius_map"] = geo_cfg.get("amenity_radius_map")
+    manager.pipeline.meta["geo_cache_file"] = str(CONFIG_DIR / geo_cfg.get("geo_cache_file"))
+    manager.pipeline_initialized = True
+    print("[Lambda] PipelineManager initialized")
 
 
 def lambda_handler(event, context):
     """
-    Lambda entry point for API Gateway
+    Lambda entry point for API Gateway.
     Expects JSON payload like:
     {
         "url": "https://www.funda.nl/detail/...",
@@ -38,6 +49,9 @@ def lambda_handler(event, context):
     }
     """
     try:
+        # Lazy-load pipeline
+        initialize_pipeline()
+
         body = event.get("body")
         if isinstance(body, str):
             body = json.loads(body)
@@ -51,9 +65,10 @@ def lambda_handler(event, context):
         manual_input = body.get("manual_input")
         headless = body.get("headless", True)
 
-        # Run the pipeline
         if url or manual_input:
-            result = manager.run_full_pipeline(url=url, manual_input=manual_input, headless=headless)
+            result = manager.run_full_pipeline(
+                url=url, manual_input=manual_input, headless=headless
+            )
             return {"statusCode": 200, "body": json.dumps(result)}
         else:
             return {"statusCode": 400, "body": json.dumps({"error": "Provide either 'url' or 'manual_input'"})}
