@@ -2,23 +2,28 @@ version: 0.2
 
 env:
   variables:
-    IMAGE_REPO_NAME: "house-price-lambda" 
+    IMAGE_REPO_NAME: "house-price-lambda"
     IMAGE_TAG: "latest"
+    AWS_ACCOUNT_ID: $AWS_ACCOUNT_ID
+    AWS_REGION: $AWS_REGION
 
 phases:
   pre_build:
     commands:
       - echo Logging in to Amazon ECR...
       - aws --version
-      - aws ecr get-login-password --region eu-north-1 | docker login --username AWS --password-stdin 149195854840.dkr.ecr.eu-north-1.amazonaws.com
+      - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
   build:
     commands:
       - echo Build started on `date`
       - echo Building the Docker image...
       - docker build --no-cache -t $IMAGE_REPO_NAME .
-      - docker tag $IMAGE_REPO_NAME:latest 149195854840.dkr.ecr.eu-north-1.amazonaws.com/$IMAGE_REPO_NAME:latest
+      - docker tag $IMAGE_REPO_NAME:$IMAGE_TAG $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG
   post_build:
     commands:
       - echo Build completed on `date`
       - echo Pushing the Docker image...
-      - docker push 149195854840.dkr.ecr.eu-north-1.amazonaws.com/$IMAGE_REPO_NAME:latest
+      - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG
+
+
+

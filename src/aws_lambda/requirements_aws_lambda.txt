@@ -17,6 +17,7 @@ mlflow>=2.9
 requests>=2.31
 selenium==4.11.2  # compatible with Python 3.10
 webdriver-manager==4.0.2  
+beautifulsoup4
 
 # AWS S3 support (only if using S3 in pipeline)
 boto3>=1.30
