@@ -4,6 +4,11 @@ data/
 *.csv
 *.html
 
+
+# Except these two
+!config/data/df_with_lat_lon_encoded.csv
+!config/data/amsterdam_amenities.csv
+
 # Ignore house pages url log
 config/house_pages_scraped.txt
 
