@@ -4,6 +4,7 @@ from geopy.geocoders import Nominatim
 from sklearn.neighbors import BallTree
 import time
 from pathlib import Path
+import os
 
 
 # ------------------- Config -------------------
@@ -68,14 +69,16 @@ def load_cache(cache_file):
     }
 
 
-def save_cache(
-    lat_lon_cache,
-    cache_file=CACHE_FILE,
-):
-    pd.DataFrame(
-        [(addr, lat, lon) for addr, (lat, lon) in lat_lon_cache.items()],
-        columns=["address", "lat", "lon"],
-    ).to_csv(cache_file, index=False)
+def save_cache(lat_lon_cache, cache_file):
+    # Only write if the path is writable
+    folder = os.path.dirname(cache_file)
+    if os.access(folder, os.W_OK):
+        pd.DataFrame(
+            [(addr, lat, lon) for addr, (lat, lon) in lat_lon_cache.items()],
+            columns=["address", "lat", "lon"],
+        ).to_csv(cache_file, index=False)
+    else:
+        print(f"[WARNING] Cache not saved, read-only folder: {folder}")
 
 
 def enrich_with_geolocation(
