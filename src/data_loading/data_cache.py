@@ -4,6 +4,7 @@ import pickle
 from pathlib import Path
 from datetime import datetime
 from typing import Any, Optional, Union
+import os
 
 
 class CacheManager:
@@ -18,11 +19,22 @@ class CacheManager:
 
     def __init__(
         self,
-        cache_dir: Union[str, Path] = "data/cache",
+        cache_dir: Union[str, Path] = "config/data/cache",
         use_timestamp: bool = False,
     ):
-        self.cache_dir = Path(cache_dir)
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        self.is_lambda = bool(os.environ.get("AWS_LAMBDA_FUNCTION_NAME"))
+        # If running in Lambda, use /tmp/cache for writes
+        if self.is_lambda:
+            self.cache_dir = Path("/tmp/cache")
+            self.cache_dir.mkdir(parents=True, exist_ok=True)
+
+            # Prepackaged cache location inside container
+            self.prepackaged_cache_dir = Path(cache_dir)
+        else:
+            self.cache_dir = Path(cache_dir)
+            self.cache_dir.mkdir(parents=True, exist_ok=True)
+            self.prepackaged_cache_dir = None
+
         self.use_timestamp = use_timestamp
 
     # -------------------------------------------------------------------------
@@ -77,8 +89,24 @@ class CacheManager:
         self, name: str, hash_key: Optional[str]
     ) -> Optional[Path]:
         """Find the most recent cache file for the given name and hash."""
-        pattern = f"{name}_{hash_key}*" if hash_key else f"{name}*"
-        matches = sorted(self.cache_dir.glob(f"{pattern}.pkl"))
+        # Lambda: first check /tmp (writable) cache
+        if self.is_lambda:
+            tmp_matches = sorted(self.cache_dir.glob(f"{name}_{hash_key}*.pkl"))
+            if tmp_matches:
+                return tmp_matches[-1]
+
+            # If not in /tmp, fallback to prepackaged cache in container
+            if self.prepackaged_cache_dir:
+                container_matches = sorted(
+                    self.prepackaged_cache_dir.glob(f"{name}_{hash_key}*.pkl")
+                )
+                if container_matches:
+                    return container_matches[-1]
+
+            return None
+
+        # Local: just use local cache_dir
+        matches = sorted(self.cache_dir.glob(f"{name}_{hash_key}*.pkl"))
         return matches[-1] if matches else None
 
     # -------------------------------------------------------------------------
