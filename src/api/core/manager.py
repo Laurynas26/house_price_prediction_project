@@ -12,8 +12,8 @@ from src.api.core.mlflow_utils import load_latest_mlflow_model
 
 RAW_JSON_PATTERN = Path(__file__).parents[3] / "data/parsed_json/*.json"
 
-S3_BUCKET = "house-predictor-data-laurynasbaltrusaitis"  
-S3_PREFIX = "data/parsed_json/" 
+S3_BUCKET = os.environ.get("S3_BUCKET")
+S3_PREFIX = os.environ.get("S3_PREFIX")
 
 class PipelineManager:
     """
