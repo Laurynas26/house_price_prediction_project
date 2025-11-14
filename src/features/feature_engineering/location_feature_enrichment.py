@@ -68,17 +68,23 @@ def load_cache(cache_file):
         and pd.notna(row["lon"])
     }
 
-
-def save_cache(lat_lon_cache, cache_file):
-    # Only write if the path is writable
-    folder = os.path.dirname(cache_file)
-    if os.access(folder, os.W_OK):
-        pd.DataFrame(
-            [(addr, lat, lon) for addr, (lat, lon) in lat_lon_cache.items()],
-            columns=["address", "lat", "lon"],
-        ).to_csv(cache_file, index=False)
+def save_cache(lat_lon_cache, cache_file="data/df_with_lat_lon_encoded.csv"):
+    # ----------- FIX: choose correct output dir -----------
+    if os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
+        # Lambda is read-only except /tmp
+        cache_file = "/tmp/df_with_lat_lon_encoded.csv"
     else:
-        print(f"[WARNING] Cache not saved, read-only folder: {folder}")
+        cache_file = Path(cache_file)
+
+    # Ensure folder exists
+    folder = Path(cache_file).parent
+    folder.mkdir(parents=True, exist_ok=True)
+
+    # Save CSV
+    pd.DataFrame(
+        [(addr, lat, lon) for addr, (lat, lon) in lat_lon_cache.items()],
+        columns=["address", "lat", "lon"],
+    ).to_csv(cache_file, index=False)
 
 
 def enrich_with_geolocation(
