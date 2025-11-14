@@ -4,6 +4,7 @@ import yaml
 import xgboost as xgb
 import pandas as pd
 import numpy as np
+import os
 
 from src.scraper.core import scrape_listing
 from src.features.preprocessing_pipeline import PreprocessingPipeline
@@ -60,9 +61,9 @@ class PipelineManager:
         if running_on_lambda:
             print("[Manager] Running on AWS Lambda: using S3 storage")
             use_s3 = True
-            local_raw_pattern = None      # Lambda has no CSV/JSON
-            load_cache = True             # Always load from S3
-            save_cache = False            # Do not write cache in Lambda
+            local_raw_pattern = None  # Lambda has no CSV/JSON
+            load_cache = True  # Always load from S3
+            save_cache = False  # Do not write cache in Lambda
         else:
             print("[Manager] Running locally: using local JSON files")
             use_s3 = False
