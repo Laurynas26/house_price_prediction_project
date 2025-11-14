@@ -52,20 +52,41 @@ class PipelineManager:
         with open(config_dir / "model_config.yaml") as f:
             model_cfg = yaml.safe_load(f)
 
-        # Initialize pipeline
+        # ------------------------------
+        # Detect environment
+        # ------------------------------
+        running_on_lambda = "LAMBDA_TASK_ROOT" in os.environ
+
+        if running_on_lambda:
+            print("[Manager] Running on AWS Lambda: using S3 storage")
+            use_s3 = True
+            local_raw_pattern = None      # Lambda has no CSV/JSON
+            load_cache = True             # Always load from S3
+            save_cache = False            # Do not write cache in Lambda
+        else:
+            print("[Manager] Running locally: using local JSON files")
+            use_s3 = False
+            local_raw_pattern = str(RAW_JSON_PATTERN)
+            load_cache = True
+            save_cache = True
+
+        # ------------------------------
+        # Create preprocessing pipeline
+        # ------------------------------
         self.pipeline = PreprocessingPipeline(
             config_paths={
                 "preprocessing": preprocessing_cfg,
                 "model": model_cfg,
             },
-            raw_json_pattern=str(RAW_JSON_PATTERN),
+            raw_json_pattern=local_raw_pattern,
+            use_s3=use_s3,
             model_config_path=config_dir / "model_config.yaml",
             model_name=model_cfg.get(
                 "model_name",
                 "xgboost_early_stopping_optuna_feature_eng_geoloc_exp",
             ),
-            load_cache=True,
-            save_cache=False,
+            load_cache=load_cache,
+            save_cache=save_cache,
         )
 
         self.pipeline.run(smart_cache=True)
