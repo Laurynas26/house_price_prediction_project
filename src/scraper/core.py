@@ -3,9 +3,12 @@ from typing import Dict, Any
 from src.scraper.scraper import FundaScraper
 from src.scraper.utils import can_scrape, save_results
 from src.scraper.logging_config import setup_logging
+import os
 
 def scrape_listing(
-    url: str, selectors_path: str = "config/selectors.json", headless: bool = True
+    url: str,
+    selectors_path: str = "config/selectors.json",
+    headless: bool = True,
 ) -> Dict[str, Any]:
     """
     Scrape a single Funda listing URL and return parsed results.
@@ -30,10 +33,17 @@ def scrape_listing(
     if not can_scrape(url):
         warning_msg = f"Scraping disallowed by robots.txt for {url}"
         logging.warning(f"[DEBUG] {warning_msg}")
-        return {"success": False, "url": url, "data": None, "error": warning_msg}
+        return {
+            "success": False,
+            "url": url,
+            "data": None,
+            "error": warning_msg,
+        }
 
     try:
-        scraper = FundaScraper(url, selectors_path=selectors_path, headless=headless)
+        scraper = FundaScraper(
+            url, selectors_path=selectors_path, headless=headless
+        )
         results = scraper.run()
 
         # Log each field for debugging
@@ -41,9 +51,22 @@ def scrape_listing(
         for k, v in results.items():
             logging.info(f"    {k}: {v}")
 
+        # ----------- FIX: choose correct output dir -----------
+        if os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
+            output_dir = "/tmp/api_scrapes"
+        else:
+            output_dir = "data/api_scrapes"
+        os.makedirs(output_dir, exist_ok=True)
+        # --------------------------------------------------------
+
         # Optionally save HTML & results for traceability
         if scraper.soup:
-            save_results(scraper.soup.prettify(), results, url, output_dir='data/api_scrapes')
+            save_results(
+                scraper.soup.prettify(),
+                results,
+                url,
+                output_dir=output_dir,
+            )
 
         return {"success": True, "url": url, "data": results, "error": None}
 
