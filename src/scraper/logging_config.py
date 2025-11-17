@@ -2,6 +2,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 import os
 
+
 def setup_logging():
     # Detect Lambda
     if os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
