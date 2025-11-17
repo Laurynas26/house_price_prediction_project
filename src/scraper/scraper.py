@@ -71,53 +71,50 @@ class FundaScraper:
         Works both locally and on AWS Lambda.
         """
         options = Options()
+        options.add_argument("--disable-gpu")
+        options.add_argument("--window-size=1920,1080")
+        options.add_argument("--disable-extensions")
+        options.add_argument("--disable-infobars")
+        options.add_argument("--disable-setuid-sandbox")
+        options.add_argument("--disable-blink-features=AutomationControlled")
+        options.add_argument("--log-level=3")
+
         if os.environ.get("LAMBDA_TASK_ROOT"):
-            # Running on Lambda
-            options.add_argument("--headless")
+            # Lambda-specific options
+            options.add_argument("--headless=new")
             options.add_argument("--no-sandbox")
             options.add_argument("--disable-dev-shm-usage")
-            options.add_argument("--disable-gpu")
-            options.add_argument("--window-size=1920,1080")
             options.add_argument("--remote-debugging-port=9222")
-            options.add_argument("--disable-dev-tools")
-            options.add_argument("--disable-extensions")
-            options.add_argument("--log-level=3")
+        else:
+            # Local
+            if self.headless:
+                options.add_argument("--headless=new")
 
-            # ChromeDriver path installed by webdriver-manager
-            driver_path = ChromeDriverManager().install()
-            service = Service(driver_path)
+        try:
+            service = Service(ChromeDriverManager().install())
             service.log_output = os.devnull  # silence Chrome logs
             self.driver = webdriver.Chrome(service=service, options=options)
-        else:
-            # Running locally
-            options.headless = self.headless
-            options.add_argument("--disable-gpu")
-            options.add_argument("--window-size=1920,1080")
-
-            self.driver = webdriver.Chrome(
-                service=Service(ChromeDriverManager().install()),
-                options=options,
-            )
+        except Exception as e:
+            logging.error(f"Failed to start ChromeDriver: {e}")
+            raise RuntimeError("ChromeDriver initialization failed.") from e
 
     def get_soup_from_url(self) -> None:
         """
         Load the page and parse its HTML with BeautifulSoup.
         """
-        assert self.driver is not None, "Driver is not initialized."
-        self.driver.get(self.url)
-
-        # wait for price element (or something guaranteed to exist)
+        assert self.driver, "Driver is not initialized."
         try:
+            self.driver.get(self.url)
             WebDriverWait(self.driver, 15).until(
                 EC.presence_of_element_located(
                     (By.CSS_SELECTOR, self.selectors["basic"]["price"])
                 )
             )
-        except Exception:
-            print(f"Timeout waiting for {self.url}")
-
-        html = self.driver.page_source
-        self.soup = BeautifulSoup(html, "html.parser")
+        except Exception as e:
+            logging.warning(f"Timeout or error waiting for page elements: {e}")
+        finally:
+            html = self.driver.page_source
+            self.soup = BeautifulSoup(html, "html.parser")
 
     def extract_text(self, selector: str, default: str = "N/A") -> str:
         """
@@ -360,78 +357,107 @@ class FundaScraper:
             self.setup_driver()
             self.get_soup_from_url()
 
-            basic = self.selectors["basic"]
-            self.results["price"] = self.extract_text(basic["price"])
-            self.results["address"] = self.extract_text(basic["address"])
-            self.results["postal_code"] = self.extract_text(
-                basic["postal_code"]
-            )
-            self.results["neighborhood"] = self.extract_text(
-                basic["neighborhood"]
-            )
-            self.results["status"] = self.extract_text(basic["status"])
+            # Wrap each parsing section if needed for robustness
+            try:
+                basic = self.selectors["basic"]
+                self.results["price"] = self.extract_text(basic["price"])
+                self.results["address"] = self.extract_text(basic["address"])
+                self.results["postal_code"] = self.extract_text(
+                    basic["postal_code"]
+                )
+                self.results["neighborhood"] = self.extract_text(
+                    basic["neighborhood"]
+                )
+                self.results["status"] = self.extract_text(basic["status"])
+            except Exception as e:
+                logging.warning(f"Error parsing basic info: {e}")
 
-            size, bedrooms, energy_label = self.parse_size_bedrooms_energy()
-            self.results["size"] = size
-            self.results["bedrooms"] = bedrooms
-            self.results["energy_label"] = energy_label
+            try:
+                size, bedrooms, energy_label = (
+                    self.parse_size_bedrooms_energy()
+                )
+                self.results["size"] = size
+                self.results["bedrooms"] = bedrooms
+                self.results["energy_label"] = energy_label
+            except Exception as e:
+                logging.warning(f"Error parsing size/bedrooms/energy: {e}")
 
-            self.results["neighborhood_details"] = (
-                self.parse_neighborhood_details()
-            )
+            try:
+                self.results["neighborhood_details"] = (
+                    self.parse_neighborhood_details()
+                )
+            except Exception as e:
+                logging.warning(f"Error parsing neighborhood details: {e}")
 
+            # Continue with other parsing sections...
             dl_labels = self.selectors["dl_labels"]
-            self.results["contribution"] = self.extract_dd_by_dt_label(
-                dl_labels["contribution_vve"]
-            )
-            self.results["year_of_construction"] = self.extract_dd_by_dt_label(
-                dl_labels["year_of_construction"]
-            )
-            self.results["roof_type"] = self.extract_dd_by_dt_label(
-                dl_labels["roof_type"]
-            )
-            self.results["living_area"] = self.extract_dd_by_dt_label(
-                dl_labels["living_area"]
-            )
-            self.results["external_storage"] = self.extract_dd_by_dt_label(
-                dl_labels["external_storage"]
-            )
-            self.results["balcony"] = self.extract_dd_by_dt_label(
-                dl_labels["balcony"]
-            )
+            for label_key, parser in [
+                ("contribution_vve", self.extract_dd_by_dt_label),
+                ("year_of_construction", self.extract_dd_by_dt_label),
+                ("roof_type", self.extract_dd_by_dt_label),
+                ("living_area", self.extract_dd_by_dt_label),
+                ("external_storage", self.extract_dd_by_dt_label),
+                ("balcony", self.extract_dd_by_dt_label),
+                (
+                    "rooms_info",
+                    lambda x: self.parse_rooms_info(
+                        self.extract_dd_by_dt_label(x)
+                    ),
+                ),
+                (
+                    "bathrooms_info",
+                    lambda x: self.parse_bathrooms_and_toilets(
+                        self.extract_dd_by_dt_label(x)
+                    ),
+                ),
+                ("located_on", self.extract_dd_by_dt_label),
+                ("facilities", self.extract_dd_by_dt_label),
+            ]:
+                try:
+                    value = parser(dl_labels[label_key])
+                    if label_key == "bathrooms_info":
+                        self.results["bathrooms"], self.results["toilets"] = (
+                            value
+                        )
+                    elif label_key == "rooms_info":
+                        self.results["nr_rooms"] = value
+                    else:
+                        self.results[label_key.replace("_info", "")] = value
+                except Exception as e:
+                    logging.warning(f"Error parsing {label_key}: {e}")
 
-            rooms_info = self.extract_dd_by_dt_label(dl_labels["rooms_info"])
-            self.results["nr_rooms"] = self.parse_rooms_info(rooms_info)
+            try:
+                cadastral_parcels, ownership_situations, charges = (
+                    self.parse_cadastral_info()
+                )
+                self.results["cadastral_parcels"] = cadastral_parcels
+                self.results["ownership_situations"] = ownership_situations
+                self.results["charges"] = charges
+            except Exception as e:
+                logging.warning(f"Error parsing cadastral info: {e}")
 
-            bathrooms_info = self.extract_dd_by_dt_label(
-                dl_labels["bathrooms_info"]
-            )
-            bathrooms, toilets = self.parse_bathrooms_and_toilets(
-                bathrooms_info
-            )
-            self.results["bathrooms"] = bathrooms
-            self.results["toilets"] = toilets
+            try:
+                self.results["outdoor_features"] = (
+                    self.parse_outdoor_features()
+                )
+            except Exception as e:
+                logging.warning(f"Error parsing outdoor features: {e}")
 
-            self.results["located_on"] = self.extract_dd_by_dt_label(
-                dl_labels["located_on"]
-            )
-            self.results["facilities"] = self.extract_dd_by_dt_label(
-                dl_labels["facilities"]
-            )
-
-            cadastral_parcels, ownership_situations, charges = (
-                self.parse_cadastral_info()
-            )
-            self.results["cadastral_parcels"] = cadastral_parcels
-            self.results["ownership_situations"] = ownership_situations
-            self.results["charges"] = charges
-
-            self.results["outdoor_features"] = self.parse_outdoor_features()
             logging.info(f"Scraping successful for URL: {self.url}")
+            self.results["success"] = True
+            return self.results
 
         except Exception as e:
-            print(f"Error during scraping: {e}")
+            logging.error(
+                f"Error during scraping {self.url}: {e}", exc_info=True
+            )
+            return {
+                "success": False,
+                "url": self.url,
+                "data": None,
+                "error": str(e),
+            }
+
         finally:
             if self.driver:
                 self.driver.quit()
-        return self.results
