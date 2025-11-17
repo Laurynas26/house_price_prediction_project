@@ -5,11 +5,13 @@ from sklearn.neighbors import BallTree
 import time
 from pathlib import Path
 import os
+import boto3
 
 
 # ------------------- Config -------------------
 CITY_CENTER = (52.3730, 4.8923)  # Dam Square, Amsterdam
 CACHE_FILE = "../data/df_with_lat_lon_encoded.csv"
+S3_BUCKET = os.environ.get("S3_BUCKET")
 
 
 # ------------------- Utilities -------------------
@@ -26,16 +28,30 @@ def haversine(lat1, lon1, lat2, lon2):
     return R * 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
 
 
-def load_cache(cache_file):
+def load_cache(cache_file=None):
     """
-    Load address -> (lat, lon) mapping from a CSV, ensuring unique addresses.
+    Load address -> (lat, lon) mapping from a CSV,
+    ensuring unique addresses.
+    Supports local file or Lambda S3 deployment.
     """
 
-    if cache_file is None:
-        raise ValueError("cache_file cannot be None")
+    # Check if running inside Lambda
+    if os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
+        # Lambda: download from S3
+        s3_bucket = S3_BUCKET
+        s3_key = "data/df_with_lat_lon_encoded.csv"
+        local_path = "/tmp/df_with_lat_lon_encoded.csv"
 
-    cache_file = Path(cache_file).resolve()
-    if not cache_file.exists():
+        s3 = boto3.client("s3")
+        s3.download_file(s3_bucket, s3_key, local_path)
+        cache_file = local_path
+    else:
+        # Local dev: use provided path
+        if cache_file is None:
+            raise ValueError("cache_file cannot be None")
+        cache_file = Path(cache_file).resolve()
+
+    if not Path(cache_file).exists():
         raise FileNotFoundError(f"Cache file not found: {cache_file}")
 
     df_cache = pd.read_csv(cache_file)
@@ -67,6 +83,7 @@ def load_cache(cache_file):
         and pd.notna(row["lat"])
         and pd.notna(row["lon"])
     }
+
 
 def save_cache(lat_lon_cache, cache_file="data/df_with_lat_lon_encoded.csv"):
     # ----------- FIX: choose correct output dir -----------
