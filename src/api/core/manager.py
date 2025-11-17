@@ -40,7 +40,8 @@ class PipelineManager:
         Can be safely called multiple times (singleton).
 
         Args:
-            config_dir: Directory with preprocessing_config.yaml and model_config.yaml
+            config_dir: Directory with preprocessing_config.yaml
+            and model_config.yaml
         """
         if self._initialized:
             print("[Manager] Already initialized, skipping re-initialization.")
