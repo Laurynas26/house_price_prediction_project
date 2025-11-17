@@ -15,6 +15,7 @@ RAW_JSON_PATTERN = Path(__file__).parents[3] / "data/parsed_json/*.json"
 S3_BUCKET = os.environ.get("S3_BUCKET")
 S3_PREFIX = os.environ.get("S3_PREFIX")
 
+
 class PipelineManager:
     """
     Singleton manager for real estate pipeline:
@@ -63,7 +64,7 @@ class PipelineManager:
         if running_on_lambda:
             print("[Manager] Running on AWS Lambda: using S3 storage")
             use_s3 = True
-            local_raw_pattern = None
+            local_raw_pattern = None  # Lambda has no local JSON/CSV
             load_cache = True
             save_cache = False
         else:
@@ -72,14 +73,6 @@ class PipelineManager:
             local_raw_pattern = str(RAW_JSON_PATTERN)
             load_cache = True
             save_cache = True
-
-        # ------------------------------
-        # Store model name as attribute
-        # ------------------------------
-        self.model_name = model_cfg.get(
-            "model_name",
-            "xgboost_early_stopping_optuna_feature_eng_geoloc_exp",
-        )
 
         # ------------------------------
         # Create preprocessing pipeline
@@ -94,7 +87,10 @@ class PipelineManager:
             s3_bucket=S3_BUCKET,
             s3_prefix=S3_PREFIX,
             model_config_path=config_dir / "model_config.yaml",
-            model_name=self.model_name,
+            model_name=model_cfg.get(
+                "model_name",
+                "xgboost_early_stopping_optuna_feature_eng_geoloc_exp",
+            ),
             load_cache=load_cache,
             save_cache=save_cache,
         )
@@ -102,27 +98,27 @@ class PipelineManager:
         if running_on_lambda:
             print("[Manager] Lambda detected → loading inference cache only")
 
-            # Load inference metadata
-            if self.pipeline.cache.exists("inference_meta", scope=self.model_name):
-                inference_meta = self.pipeline.cache.load(
-                    "inference_meta", scope=self.model_name
-                )
-                self.pipeline.meta = inference_meta["meta"]
-                self.pipeline.expected_columns = inference_meta["expected_columns"]
+            # Load inference metadata (no scope/hash for inference_meta)
+            if self.pipeline.cache.exists("inference_meta"):
+                inference_meta = self.pipeline.cache.load("inference_meta")
 
-                print(f"[Manager] Loaded inference metadata: "
-                    f"{len(self.pipeline.expected_columns)} expected columns")
+                self.pipeline.meta = inference_meta.get("meta")
+                self.pipeline.expected_columns = inference_meta.get(
+                    "expected_columns"
+                )
+
+                print(
+                    f"[Manager] Loaded inference metadata: "
+                    f"{len(self.pipeline.expected_columns)} expected columns"
+                )
             else:
                 raise RuntimeError(
                     "Running on Lambda but inference_meta cache not found. "
                     "Run preprocessing locally and upload cache folder."
                 )
-
         else:
-            # Local environment → allow full training pipeline
+            # Local environment → allow full pipeline
             self.pipeline.run(smart_cache=True)
-
-            # Safety fallback
             if self.pipeline.meta is None or self.pipeline.X_train is None:
                 print("[Manager] ⚠️ Cached pipeline incomplete, refitting...")
                 self.pipeline.run(smart_cache=False)
@@ -130,7 +126,9 @@ class PipelineManager:
         # --- MLflow model loading ---
         production_model_name = model_cfg.get("production_model_name")
         if not production_model_name:
-            raise RuntimeError("Model name must be specified in model_config.yaml")
+            raise RuntimeError(
+                "Model name must be specified in model_config.yaml"
+            )
 
         experiment_name = "house_price_prediction"
         try:
