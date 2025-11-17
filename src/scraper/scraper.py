@@ -67,39 +67,37 @@ class FundaScraper:
 
     def setup_driver(self) -> None:
         """
-        Set up the Chrome WebDriver with options.
+        Set up Chrome WebDriver with proper options depending on environment.
+        Works both locally and on AWS Lambda.
         """
         options = Options()
-        options.headless = self.headless
+        if os.environ.get("LAMBDA_TASK_ROOT"):
+            # Running on Lambda
+            options.add_argument("--headless")
+            options.add_argument("--no-sandbox")
+            options.add_argument("--disable-dev-shm-usage")
+            options.add_argument("--disable-gpu")
+            options.add_argument("--window-size=1920,1080")
+            options.add_argument("--remote-debugging-port=9222")
+            options.add_argument("--disable-dev-tools")
+            options.add_argument("--disable-extensions")
+            options.add_argument("--log-level=3")
 
-        # Add critical flags for Docker / API runtime
-        options = Options()
-        options.add_argument("--headless=new")
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--disable-gpu")
-        options.add_argument("--disable-extensions")
-        options.add_argument("--disable-infobars")
-        options.add_argument("--disable-setuid-sandbox")
-        options.add_argument("--disable-blink-features=AutomationControlled")
-        options.add_argument("--window-size=1920,1080")
-        options.add_argument("--remote-debugging-port=9222")
-        options.add_argument("--log-level=3")
+            # ChromeDriver path installed by webdriver-manager
+            driver_path = ChromeDriverManager().install()
+            service = Service(driver_path)
+            service.log_output = os.devnull  # silence Chrome logs
+            self.driver = webdriver.Chrome(service=service, options=options)
+        else:
+            # Running locally
+            options.headless = self.headless
+            options.add_argument("--disable-gpu")
+            options.add_argument("--window-size=1920,1080")
 
-        service = Service(ChromeDriverManager().install())
-
-        null_log = os.devnull
-        service.log_output = null_log
-        self.driver = webdriver.Chrome(service=service, options=options)
-
-    # def get_soup_from_url(self) -> None:
-    #     """
-    #     Load the page and parse its HTML with BeautifulSoup.
-    #     """
-    #     assert self.driver is not None, "Driver is not initialized."
-    #     self.driver.get(self.url)
-    #     html = self.driver.page_source
-    #     self.soup = BeautifulSoup(html, "html.parser")
+            self.driver = webdriver.Chrome(
+                service=Service(ChromeDriverManager().install()),
+                options=options,
+            )
 
     def get_soup_from_url(self) -> None:
         """

@@ -4,6 +4,8 @@ from src.scraper.scraper import FundaScraper
 from src.scraper.utils import can_scrape, save_results
 from src.scraper.logging_config import setup_logging
 import os
+import traceback
+
 
 def scrape_listing(
     url: str,
@@ -13,19 +15,6 @@ def scrape_listing(
     """
     Scrape a single Funda listing URL and return parsed results.
     Handles errors gracefully for API usage.
-
-    Args:
-        url (str): Funda listing URL.
-        selectors_path (str): Path to JSON selectors config.
-        headless (bool): Run Chrome in headless mode.
-
-    Returns:
-        dict: {
-            "success": bool,
-            "url": str,
-            "data": dict (parsed results) or None,
-            "error": str or None
-        }
     """
     setup_logging()
     logging.info(f"[DEBUG] Starting scrape for {url}")
@@ -44,32 +33,47 @@ def scrape_listing(
         scraper = FundaScraper(
             url, selectors_path=selectors_path, headless=headless
         )
-        results = scraper.run()
 
-        # Log each field for debugging
+        # Try to run scraper and catch any selenium/browser errors
+        try:
+            results = scraper.run()
+        except Exception as e:
+            logging.error(f"[ERROR] Selenium scrape failed for {url}: {e}")
+            logging.error(traceback.format_exc())
+            return {
+                "success": False,
+                "url": url,
+                "data": None,
+                "error": f"Selenium error: {str(e)}",
+            }
+
         logging.info("[DEBUG] Scraper raw results:")
         for k, v in results.items():
             logging.info(f"    {k}: {v}")
 
-        # ----------- FIX: choose correct output dir -----------
-        if os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
-            output_dir = "/tmp/api_scrapes"
-        else:
-            output_dir = "data/api_scrapes"
+        # Correct output dir based on environment
+        output_dir = (
+            "/tmp/api_scrapes"
+            if os.environ.get("AWS_LAMBDA_FUNCTION_NAME")
+            else "data/api_scrapes"
+        )
         os.makedirs(output_dir, exist_ok=True)
-        # --------------------------------------------------------
 
-        # Optionally save HTML & results for traceability
+        # Save HTML & results if available
         if scraper.soup:
-            save_results(
-                scraper.soup.prettify(),
-                results,
-                url,
-                output_dir=output_dir,
-            )
+            try:
+                save_results(
+                    scraper.soup.prettify(),
+                    results,
+                    url,
+                    output_dir=output_dir,
+                )
+            except Exception as e:
+                logging.warning(f"[WARN] Failed saving results: {e}")
 
         return {"success": True, "url": url, "data": results, "error": None}
 
     except Exception as e:
-        logging.error(f"[ERROR] Scraping failed for {url}: {e}")
+        logging.error(f"[ERROR] scrape_listing failed for {url}: {e}")
+        logging.error(traceback.format_exc())
         return {"success": False, "url": url, "data": None, "error": str(e)}
