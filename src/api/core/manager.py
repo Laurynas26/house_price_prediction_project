@@ -94,7 +94,31 @@ class PipelineManager:
             save_cache=save_cache,
         )
 
-        self.pipeline.run(smart_cache=True)
+        if running_on_lambda:
+            print("[Manager] Lambda detected → loading inference cache only")
+
+            # Load inference metadata saved locally during preprocessing
+            if self.pipeline.cache.exists("inference_meta", scope=self.model_name):
+                inference_meta = self.pipeline.cache.load(
+                    "inference_meta", scope=self.model_name
+                )
+
+                self.pipeline.meta = inference_meta["meta"]
+                self.pipeline.expected_columns = inference_meta["expected_columns"]
+
+                print(f"[Manager] Loaded inference metadata: "
+                    f"{len(self.pipeline.expected_columns)} expected columns")
+
+            else:
+                raise RuntimeError(
+                    "Running on Lambda but inference_meta cache not found. "
+                    "Run preprocessing locally and upload cache folder."
+                )
+
+        else:
+            # Local environment → allow full training pipeline
+            self.pipeline.run(smart_cache=True)
+            print("[DEBUG] After pipeline run:")
         print("[DEBUG] After pipeline run:")
         print(
             " - X_train:",

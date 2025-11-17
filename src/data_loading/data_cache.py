@@ -5,6 +5,7 @@ from pathlib import Path
 from datetime import datetime
 from typing import Any, Optional, Union
 import os
+import boto3
 
 
 class CacheManager:
@@ -22,6 +23,10 @@ class CacheManager:
         cache_dir: Union[str, Path] = "config/data/cache",
         use_timestamp: bool = False,
     ):
+        self.s3_bucket = os.environ.get("CACHE_BUCKET")
+        self.s3_prefix = os.environ.get("CACHE_PREFIX", "cache/")
+        self.s3 = boto3.client("s3") if self.s3_bucket else None
+
         self.is_lambda = bool(os.environ.get("AWS_LAMBDA_FUNCTION_NAME"))
         # If running in Lambda, use /tmp/cache for writes
         if self.is_lambda:
@@ -91,7 +96,9 @@ class CacheManager:
         """Find the most recent cache file for the given name and hash."""
         # Lambda: first check /tmp (writable) cache
         if self.is_lambda:
-            tmp_matches = sorted(self.cache_dir.glob(f"{name}_{hash_key}*.pkl"))
+            tmp_matches = sorted(
+                self.cache_dir.glob(f"{name}_{hash_key}*.pkl")
+            )
             if tmp_matches:
                 return tmp_matches[-1]
 
@@ -103,11 +110,29 @@ class CacheManager:
                 if container_matches:
                     return container_matches[-1]
 
-            return None
+        # Fallback: direct file (no timestamp)
+        fallback = self.cache_dir / f"{name}_{hash_key}.pkl"
+        return fallback if fallback.exists() else None
+
 
         # Local: just use local cache_dir
         matches = sorted(self.cache_dir.glob(f"{name}_{hash_key}*.pkl"))
         return matches[-1] if matches else None
+
+    def _s3_exists(self, key: str) -> bool:
+        if not self.s3:
+            return False
+        try:
+            self.s3.head_object(Bucket=self.s3_bucket, Key=key)
+            return True
+        except:
+            return False
+
+    def _download_from_s3(self, key: str, local_path: Path):
+        local_path.parent.mkdir(parents=True, exist_ok=True)
+        print(f"⬇️ Downloading from S3: s3://{self.s3_bucket}/{key}")
+        self.s3.download_file(self.s3_bucket, key, str(local_path))
+        return local_path
 
     # -------------------------------------------------------------------------
     # Core API
@@ -119,10 +144,24 @@ class CacheManager:
         config: Optional[dict] = None,
         scope: Optional[str] = None,
     ) -> bool:
-        """Check if cached data exists for the given name and config subset."""
         subconfig = self._normalize_config(config, scope)
         hash_key = self._make_hash(subconfig)
-        return any(self.cache_dir.glob(f"{name}_{hash_key}*.pkl"))
+        pattern = f"{name}_{hash_key}.pkl"
+
+        # Check local cache (/tmp or config/data/cache)
+        local_matches = list(self.cache_dir.glob(pattern))
+        if local_matches:
+            return True
+
+        # Check prepackaged cache inside Lambda image
+        if self.is_lambda and self.prepackaged_cache_dir:
+            container_matches = list(self.prepackaged_cache_dir.glob(pattern))
+            if container_matches:
+                return True
+
+        # Check S3
+        s3_key = f"{self.s3_prefix}{pattern}"
+        return self._s3_exists(s3_key)
 
     def save(
         self,
@@ -152,22 +191,35 @@ class CacheManager:
         config: Optional[dict] = None,
         scope: Optional[str] = None,
     ) -> Any:
-        """Load the most recent cache matching the given name
-        and config subset."""
+        """Load cache from local, prepackaged, or S3."""
         subconfig = self._normalize_config(config, scope)
         hash_key = self._make_hash(subconfig)
+        filename = f"{name}_{hash_key}.pkl"
+
+        # 1. Try resolving locally (/tmp or prepackaged cache)
         path = self._resolve_latest_path(name, hash_key)
 
+        # 2. If not found locally → try S3
+        if (not path or not path.exists()) and self.s3:
+            s3_key = f"{self.s3_prefix}{filename}"
+            if self._s3_exists(s3_key):
+                local_path = self.cache_dir / filename
+                self._download_from_s3(s3_key, local_path)
+                path = local_path
+
+        # 3. If still missing → fail
         if not path or not path.exists():
             raise FileNotFoundError(
                 f"No cache found for: {name} ({scope or 'full'})"
             )
 
+        # 4. Load file
         with open(path, "rb") as f:
             obj = pickle.load(f)
 
-        print(f"✅ Loaded [{name}] ← {path.name}")
+        print(f"✅ Loaded [{name}] ← {path}")
         return obj
+
 
     def clear(self, name: Optional[str] = None):
         """Remove one or all cached items."""
