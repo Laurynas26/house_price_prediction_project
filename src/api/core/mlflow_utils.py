@@ -11,7 +11,7 @@ MODEL_BUCKET = os.environ.get("MODEL_BUCKET")
 MODEL_FOLDER = os.environ.get("MODEL_FOLDER")
 
 
-def load_latest_model(
+def load_latest_mlflow_model(
     model_name: str,
     experiment_name: str = "house_price_prediction"
 ):
