@@ -127,11 +127,27 @@ class CacheManager:
     ) -> bool:
         subconfig = self._normalize_config(config, scope)
         hash_key = self._make_hash(subconfig)
-        filename = f"{name}_{hash_key}.pkl"
-        if self._resolve_latest_path(name, hash_key):
+        pattern = f"{name}_{hash_key}.pkl" if hash_key else f"{name}.pkl"
+
+        # Check local cache
+        if any(self.cache_dir.glob(pattern)):
             return True
-        s3_key = f"{self.s3_prefix}{filename}"
-        return self._s3_exists(s3_key)
+
+        # Check prepackaged container cache
+        if self.is_lambda and self.prepackaged_cache_dir:
+            if any(self.prepackaged_cache_dir.glob(pattern)):
+                return True
+
+        # Check S3
+        if self.s3:
+            s3_key = f"{self.s3_prefix}{name}.pkl"
+            try:
+                self.s3.head_object(Bucket=self.s3_bucket, Key=s3_key)
+                return True
+            except self.s3.exceptions.ClientError:
+                return False
+
+        return False
 
     def save(
         self,
@@ -167,30 +183,23 @@ class CacheManager:
     ) -> Any:
         subconfig = self._normalize_config(config, scope)
         hash_key = self._make_hash(subconfig)
-        filename = f"{name}_{hash_key}.pkl"
+        filename = f"{name}_{hash_key}.pkl" if hash_key else f"{name}.pkl"
 
-        # 1️⃣ Try local cache first
+        # Try local or container first
         path = self._resolve_latest_path(name, hash_key)
 
-        # 2️⃣ Auto-download from S3 if missing locally
+        # If not found locally, try S3
         if (not path or not path.exists()) and self.s3:
             s3_key = f"{self.s3_prefix}{filename}"
             if self._s3_exists(s3_key):
-                local_path = self.cache_dir / filename
-                self._download_from_s3(s3_key, local_path)
-                path = local_path
+                path = self.cache_dir / filename
+                self._download_from_s3(s3_key, path)
 
-        # 3️⃣ Fail if still missing
         if not path or not path.exists():
-            raise FileNotFoundError(
-                f"No cache found for: {name} ({scope or 'full'})"
-            )
+            raise FileNotFoundError(f"No cache found for: {name}")
 
-        # 4️⃣ Load the object
         with open(path, "rb") as f:
             obj = pickle.load(f)
-
-        print(f"✅ Loaded [{name}] ← {path}")
         return obj
 
     def clear(self, name: Optional[str] = None):
