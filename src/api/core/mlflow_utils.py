@@ -31,7 +31,7 @@ def load_latest_model(
         model_uri = f"s3://{MODEL_BUCKET}/{MODEL_FOLDER}"
         print(f"[Lambda] Loading model from S3: {model_uri}")
         model = mlflow.xgboost.load_model(model_uri)
-        print(f"[Lambda] ✅ Model loaded successfully from S3.")
+        print("[Lambda] ✅ Model loaded successfully from S3.")
         return model
 
     # --- Local/dev: use MLflow local tracking ---
