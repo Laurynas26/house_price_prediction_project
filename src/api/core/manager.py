@@ -40,8 +40,7 @@ class PipelineManager:
         Can be safely called multiple times (singleton).
 
         Args:
-            config_dir: Directory with preprocessing.yml and model.yml
-            model_path: Path to trained model (.joblib/.pkl)
+            config_dir: Directory with preprocessing_config.yaml and model_config.yaml
         """
         if self._initialized:
             print("[Manager] Already initialized, skipping re-initialization.")
@@ -63,15 +62,23 @@ class PipelineManager:
         if running_on_lambda:
             print("[Manager] Running on AWS Lambda: using S3 storage")
             use_s3 = True
-            local_raw_pattern = None  # Lambda has no CSV/JSON
-            load_cache = True  # Always load from S3
-            save_cache = False  # Do not write cache in Lambda
+            local_raw_pattern = None
+            load_cache = True
+            save_cache = False
         else:
             print("[Manager] Running locally: using local JSON files")
             use_s3 = False
             local_raw_pattern = str(RAW_JSON_PATTERN)
             load_cache = True
             save_cache = True
+
+        # ------------------------------
+        # Store model name as attribute
+        # ------------------------------
+        self.model_name = model_cfg.get(
+            "model_name",
+            "xgboost_early_stopping_optuna_feature_eng_geoloc_exp",
+        )
 
         # ------------------------------
         # Create preprocessing pipeline
@@ -86,10 +93,7 @@ class PipelineManager:
             s3_bucket=S3_BUCKET,
             s3_prefix=S3_PREFIX,
             model_config_path=config_dir / "model_config.yaml",
-            model_name=model_cfg.get(
-                "model_name",
-                "xgboost_early_stopping_optuna_feature_eng_geoloc_exp",
-            ),
+            model_name=self.model_name,
             load_cache=load_cache,
             save_cache=save_cache,
         )
@@ -97,18 +101,16 @@ class PipelineManager:
         if running_on_lambda:
             print("[Manager] Lambda detected → loading inference cache only")
 
-            # Load inference metadata saved locally during preprocessing
+            # Load inference metadata
             if self.pipeline.cache.exists("inference_meta", scope=self.model_name):
                 inference_meta = self.pipeline.cache.load(
                     "inference_meta", scope=self.model_name
                 )
-
                 self.pipeline.meta = inference_meta["meta"]
                 self.pipeline.expected_columns = inference_meta["expected_columns"]
 
                 print(f"[Manager] Loaded inference metadata: "
                     f"{len(self.pipeline.expected_columns)} expected columns")
-
             else:
                 raise RuntimeError(
                     "Running on Lambda but inference_meta cache not found. "
@@ -118,30 +120,16 @@ class PipelineManager:
         else:
             # Local environment → allow full training pipeline
             self.pipeline.run(smart_cache=True)
-            print("[DEBUG] After pipeline run:")
-        print("[DEBUG] After pipeline run:")
-        print(
-            " - X_train:",
-            type(self.pipeline.X_train),
-            getattr(self.pipeline.X_train, "shape", None),
-        )
-        print(" - scaler:", type(self.pipeline.scaler))
-        print(
-            " - meta keys:",
-            list(self.pipeline.meta.keys()) if self.pipeline.meta else None,
-        )
 
-        # --- Safety fallback ---
-        if self.pipeline.meta is None or self.pipeline.X_train is None:
-            print("[Manager] ⚠️ Cached pipeline incomplete, refitting...")
-            self.pipeline.run(smart_cache=False)
+            # Safety fallback
+            if self.pipeline.meta is None or self.pipeline.X_train is None:
+                print("[Manager] ⚠️ Cached pipeline incomplete, refitting...")
+                self.pipeline.run(smart_cache=False)
 
         # --- MLflow model loading ---
         production_model_name = model_cfg.get("production_model_name")
         if not production_model_name:
-            raise RuntimeError(
-                "Model name must be specified in model_config.yaml"
-            )
+            raise RuntimeError("Model name must be specified in model_config.yaml")
 
         experiment_name = "house_price_prediction"
         try:
