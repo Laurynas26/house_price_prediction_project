@@ -1,11 +1,13 @@
 import hashlib
 import json
-import pickle
-from pathlib import Path
-from datetime import datetime
-from typing import Any, Optional, Union
 import os
+import pickle
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Optional, Union
+
 import boto3
+import botocore
 
 
 class CacheManager:
@@ -13,9 +15,10 @@ class CacheManager:
     General-purpose cache manager for storing and loading intermediate
     pipeline data (e.g., preprocessed or feature-engineered datasets).
 
-    Adapted for nested YAML configs:
-    - Can hash specific sub-configs (e.g., per-model or feature-exp block)
-    - Automatically handles deeply nested dictionaries
+    Features:
+    - Nested YAML config hashing for scoped cache
+    - Automatic upload to S3
+    - Auto-download from S3 if cache not present locally
     """
 
     def __init__(
@@ -28,13 +31,15 @@ class CacheManager:
         self.s3 = boto3.client("s3") if self.s3_bucket else None
 
         self.is_lambda = bool(os.environ.get("AWS_LAMBDA_FUNCTION_NAME"))
-        # If running in Lambda, use /tmp/cache for writes
+
+        # Writable cache directory
         if self.is_lambda:
             self.cache_dir = Path("/tmp/cache")
             self.cache_dir.mkdir(parents=True, exist_ok=True)
-
-            # Prepackaged cache location inside container
-            self.prepackaged_cache_dir = Path(cache_dir)
+            prepackaged_path = Path(cache_dir)
+            self.prepackaged_cache_dir = (
+                prepackaged_path if prepackaged_path.exists() else None
+            )
         else:
             self.cache_dir = Path(cache_dir)
             self.cache_dir.mkdir(parents=True, exist_ok=True)
@@ -42,47 +47,32 @@ class CacheManager:
 
         self.use_timestamp = use_timestamp
 
-    # -------------------------------------------------------------------------
-    # Internal Helpers
-    # -------------------------------------------------------------------------
+    # ----------------------- Helpers -----------------------
 
     @staticmethod
     def _normalize_config(
         config: Optional[dict], scope: Optional[str] = None
     ) -> Optional[dict]:
-        """
-        Extract a sub-config by scope name (e.g., 'preprocessing' or 'model').
-        If scope is not found, returns the full config instead
-        of raising KeyError.
-        """
         if config is None:
             return None
-
         if scope:
             if not isinstance(config, dict):
                 raise TypeError(
                     f"Expected dict for config, got {type(config)}"
                 )
-            return config.get(
-                scope, config
-            )  # <- return subconfig or full config
-
+            return config.get(scope, config)
         return config
 
     @staticmethod
     def _make_hash(config: Optional[dict]) -> Optional[str]:
-        """Generate a short deterministic hash string from
-        a nested config dict."""
         if config is None:
             return None
-        # Ensure consistent key order and hash only relevant subset
         config_str = json.dumps(config, sort_keys=True, default=str)
         return hashlib.md5(config_str.encode("utf-8")).hexdigest()[:8]
 
     def _get_path(
         self, name: str, hash_key: Optional[str] = None, suffix: str = ".pkl"
     ) -> Path:
-        """Construct the cache file path."""
         parts = [name]
         if hash_key:
             parts.append(hash_key)
@@ -93,31 +83,18 @@ class CacheManager:
     def _resolve_latest_path(
         self, name: str, hash_key: Optional[str]
     ) -> Optional[Path]:
-        """Find the most recent cache file for the given name and hash."""
-        # Lambda: first check /tmp (writable) cache
-        if self.is_lambda:
-            tmp_matches = sorted(
-                self.cache_dir.glob(f"{name}_{hash_key}*.pkl")
+        pattern = f"{name}_{hash_key}*.pkl"
+        local_matches = sorted(self.cache_dir.glob(pattern))
+        if local_matches:
+            return local_matches[-1]
+        if self.is_lambda and self.prepackaged_cache_dir:
+            container_matches = sorted(
+                self.prepackaged_cache_dir.glob(pattern)
             )
-            if tmp_matches:
-                return tmp_matches[-1]
-
-            # If not in /tmp, fallback to prepackaged cache in container
-            if self.prepackaged_cache_dir:
-                container_matches = sorted(
-                    self.prepackaged_cache_dir.glob(f"{name}_{hash_key}*.pkl")
-                )
-                if container_matches:
-                    return container_matches[-1]
-
-        # Fallback: direct file (no timestamp)
+            if container_matches:
+                return container_matches[-1]
         fallback = self.cache_dir / f"{name}_{hash_key}.pkl"
         return fallback if fallback.exists() else None
-
-
-        # Local: just use local cache_dir
-        matches = sorted(self.cache_dir.glob(f"{name}_{hash_key}*.pkl"))
-        return matches[-1] if matches else None
 
     def _s3_exists(self, key: str) -> bool:
         if not self.s3:
@@ -125,7 +102,7 @@ class CacheManager:
         try:
             self.s3.head_object(Bucket=self.s3_bucket, Key=key)
             return True
-        except:
+        except botocore.exceptions.ClientError:
             return False
 
     def _download_from_s3(self, key: str, local_path: Path):
@@ -134,9 +111,13 @@ class CacheManager:
         self.s3.download_file(self.s3_bucket, key, str(local_path))
         return local_path
 
-    # -------------------------------------------------------------------------
-    # Core API
-    # -------------------------------------------------------------------------
+    def _upload_to_s3(self, local_path: Path, key: str):
+        if not self.s3:
+            return
+        print(f"⬆️ Uploading to S3: s3://{self.s3_bucket}/{key}")
+        self.s3.upload_file(str(local_path), self.s3_bucket, key)
+
+    # ----------------------- Core API -----------------------
 
     def exists(
         self,
@@ -146,21 +127,10 @@ class CacheManager:
     ) -> bool:
         subconfig = self._normalize_config(config, scope)
         hash_key = self._make_hash(subconfig)
-        pattern = f"{name}_{hash_key}.pkl"
-
-        # Check local cache (/tmp or config/data/cache)
-        local_matches = list(self.cache_dir.glob(pattern))
-        if local_matches:
+        filename = f"{name}_{hash_key}.pkl"
+        if self._resolve_latest_path(name, hash_key):
             return True
-
-        # Check prepackaged cache inside Lambda image
-        if self.is_lambda and self.prepackaged_cache_dir:
-            container_matches = list(self.prepackaged_cache_dir.glob(pattern))
-            if container_matches:
-                return True
-
-        # Check S3
-        s3_key = f"{self.s3_prefix}{pattern}"
+        s3_key = f"{self.s3_prefix}{filename}"
         return self._s3_exists(s3_key)
 
     def save(
@@ -171,7 +141,6 @@ class CacheManager:
         scope: Optional[str] = None,
         as_pickle: bool = True,
     ) -> Path:
-        """Save a Python object or DataFrame with config-based versioning."""
         subconfig = self._normalize_config(config, scope)
         hash_key = self._make_hash(subconfig)
         path = self._get_path(name, hash_key)
@@ -182,6 +151,11 @@ class CacheManager:
         else:
             obj.to_pickle(path)
 
+        # Upload to S3 automatically
+        if self.s3_bucket:
+            s3_key = f"{self.s3_prefix}{path.name}"
+            self._upload_to_s3(path, s3_key)
+
         print(f"💾 Cached [{name}] → {path}")
         return path
 
@@ -191,15 +165,14 @@ class CacheManager:
         config: Optional[dict] = None,
         scope: Optional[str] = None,
     ) -> Any:
-        """Load cache from local, prepackaged, or S3."""
         subconfig = self._normalize_config(config, scope)
         hash_key = self._make_hash(subconfig)
         filename = f"{name}_{hash_key}.pkl"
 
-        # 1. Try resolving locally (/tmp or prepackaged cache)
+        # 1️⃣ Try local cache first
         path = self._resolve_latest_path(name, hash_key)
 
-        # 2. If not found locally → try S3
+        # 2️⃣ Auto-download from S3 if missing locally
         if (not path or not path.exists()) and self.s3:
             s3_key = f"{self.s3_prefix}{filename}"
             if self._s3_exists(s3_key):
@@ -207,22 +180,20 @@ class CacheManager:
                 self._download_from_s3(s3_key, local_path)
                 path = local_path
 
-        # 3. If still missing → fail
+        # 3️⃣ Fail if still missing
         if not path or not path.exists():
             raise FileNotFoundError(
                 f"No cache found for: {name} ({scope or 'full'})"
             )
 
-        # 4. Load file
+        # 4️⃣ Load the object
         with open(path, "rb") as f:
             obj = pickle.load(f)
 
         print(f"✅ Loaded [{name}] ← {path}")
         return obj
 
-
     def clear(self, name: Optional[str] = None):
-        """Remove one or all cached items."""
         if name:
             for file in self.cache_dir.glob(f"{name}*"):
                 file.unlink(missing_ok=True)
