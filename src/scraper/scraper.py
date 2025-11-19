@@ -57,11 +57,16 @@ class FundaScraper:
         self.soup: Optional[BeautifulSoup] = None
         self.results: Dict[str, Any] = {}
 
-        # Load selectors JSON config
+        # Auto-locate selectors.json relative to this file
+        module_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.abspath(os.path.join(module_dir, "..", ".."))
+        selectors_path = os.path.join(project_root, "config", "selectors.json")
+
         if not os.path.exists(selectors_path):
             raise FileNotFoundError(
-                f"Selectors file not found: {selectors_path}"
+                f"Selectors file not found at: {selectors_path}"
             )
+
         with open(selectors_path, "r", encoding="utf-8") as f:
             self.selectors = json.load(f)
 
