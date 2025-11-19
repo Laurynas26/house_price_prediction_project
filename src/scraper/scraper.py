@@ -2,7 +2,6 @@ import logging
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
-from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -86,7 +85,7 @@ class FundaScraper:
 
         if os.environ.get("LAMBDA_TASK_ROOT"):
             # Lambda-specific options
-            options.add_argument("--headless=new")
+            options.add_argument("--headless=old")
             options.add_argument("--no-sandbox")
             options.add_argument("--disable-dev-shm-usage")
             options.add_argument("--remote-debugging-port=9222")
@@ -96,9 +95,27 @@ class FundaScraper:
                 options.add_argument("--headless=new")
 
         try:
-            service = Service(ChromeDriverManager().install())
-            service.log_output = os.devnull  # silence Chrome logs
+            if os.environ.get("LAMBDA_TASK_ROOT"):
+                # AWS Lambda paths (Amazon Linux)
+                CHROME_PATH = "/usr/bin/chromium-browser"
+                CHROMEDRIVER_PATH = "/usr/bin/chromedriver"
+
+                options.binary_location = CHROME_PATH
+                options.add_argument("--headless=old")
+                options.add_argument("--no-sandbox")
+                options.add_argument("--disable-dev-shm-usage")
+                options.add_argument("--disable-gpu")
+                options.add_argument("--single-process")
+                options.add_argument("--remote-debugging-port=9222")
+
+                service = Service(CHROMEDRIVER_PATH)
+
+            else:
+                # Local machine (uses system-installed Chrome + chromedriver)
+                service = Service()  # auto-resolves chromedriver in PATH
+
             self.driver = webdriver.Chrome(service=service, options=options)
+
         except Exception as e:
             logging.error(f"Failed to start ChromeDriver: {e}")
             raise RuntimeError("ChromeDriver initialization failed.") from e
