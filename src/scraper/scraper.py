@@ -362,7 +362,6 @@ class FundaScraper:
             self.setup_driver()
             self.get_soup_from_url()
 
-            # Wrap each parsing section if needed for robustness
             try:
                 basic = self.selectors["basic"]
                 self.results["price"] = self.extract_text(basic["price"])
@@ -394,7 +393,6 @@ class FundaScraper:
             except Exception as e:
                 logging.warning(f"Error parsing neighborhood details: {e}")
 
-            # Continue with other parsing sections...
             dl_labels = self.selectors["dl_labels"]
             for label_key, parser in [
                 ("contribution_vve", self.extract_dd_by_dt_label),
@@ -448,9 +446,14 @@ class FundaScraper:
             except Exception as e:
                 logging.warning(f"Error parsing outdoor features: {e}")
 
+            # --- FIX HERE: always return consistent structure ---
             logging.info(f"Scraping successful for URL: {self.url}")
-            self.results["success"] = True
-            return self.results
+            return {
+                "success": True,
+                "url": self.url,
+                "data": self.results,
+                "error": None,
+            }
 
         except Exception as e:
             logging.error(
