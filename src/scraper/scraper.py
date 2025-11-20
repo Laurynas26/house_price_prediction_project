@@ -71,36 +71,36 @@ class FundaScraper:
 
     def setup_driver(self) -> None:
         """
-        Set up Chrome WebDriver with proper options depending on environment.
-        Works both locally and on AWS Lambda.
+        Set up Chrome WebDriver for local or AWS Lambda (Sparticuz Chromium).
         """
         options = Options()
         options.add_argument("--disable-gpu")
         options.add_argument("--window-size=1920,1080")
         options.add_argument("--disable-extensions")
         options.add_argument("--disable-infobars")
-        options.add_argument("--disable-setuid-sandbox")
         options.add_argument("--disable-blink-features=AutomationControlled")
         options.add_argument("--log-level=3")
 
         if os.environ.get("LAMBDA_TASK_ROOT"):
-            CHROME_PATH = "/opt/chromium/chrome"
-            CHROMEDRIVER_PATH = "/usr/bin/chromedriver"
+            # Sparticuz Chromium paths in Lambda container
+            chrome_path = os.environ.get("CHROME_PATH", "/opt/chromium/chrome")
+            chromedriver_path = os.environ.get(
+                "CHROMEDRIVER_PATH", "/usr/bin/chromedriver"
+            )
 
-            options.binary_location = CHROME_PATH
+            options.binary_location = chrome_path
             options.add_argument("--headless=new")
             options.add_argument("--no-sandbox")
             options.add_argument("--disable-dev-shm-usage")
-            options.add_argument("--disable-gpu")
             options.add_argument("--single-process")
             options.add_argument("--disable-software-rasterizer")
 
-            service = Service(CHROMEDRIVER_PATH)
+            service = Service(chromedriver_path)
 
         else:
             if self.headless:
                 options.add_argument("--headless=new")
-            service = Service()
+            service = Service()  # local chromedriver
 
         try:
             self.driver = webdriver.Chrome(service=service, options=options)

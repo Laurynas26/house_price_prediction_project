@@ -28,20 +28,16 @@ RUN yum -y update && \
     && yum clean all
 
 
-# Download Sparticuz Chromium
-RUN wget -O /tmp/chromium.tar \
-    https://github.com/Sparticuz/chromium/releases/download/v141.0.0/chromium-v141.0.0-pack.x64.tar && \
+# Download Sparticuz Chromium + Chromedriver
+RUN wget -O /tmp/chromium.zip \
+    https://github.com/Sparticuz/chromium/releases/download/v141.0.0/chromium-v141.0.0-layer.x64.zip && \
     mkdir -p /opt/chromium && \
-    tar -xf /tmp/chromium.tar -C /opt/chromium && \
-    rm /tmp/chromium.tar
+    unzip /tmp/chromium.zip -d /opt/chromium && \
+    rm /tmp/chromium.zip
 
-# Download matching chromedriver
-RUN wget -O /tmp/chromedriver.zip \
-    https://github.com/Sparticuz/chromium/releases/download/v141.0.0/chromedriver-v141.0.0-linux64.zip && \
-    unzip /tmp/chromedriver.zip -d /opt && \
-    mv /opt/chromedriver /usr/bin/chromedriver && \
-    chmod +x /usr/bin/chromedriver && \
-    rm /tmp/chromedriver.zip
+# Make chromedriver executable
+RUN chmod +x /opt/chromium/chromedriver && \
+    mv /opt/chromium/chromedriver /usr/bin/chromedriver
 
 # Set environment variables
 ENV CHROME_PATH="/opt/chromium/chrome"
