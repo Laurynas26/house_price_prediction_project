@@ -84,14 +84,20 @@ class FundaScraper:
         options.add_argument("--log-level=3")
 
         if os.environ.get("LAMBDA_TASK_ROOT"):
-            # Use Amazon Linux chromium
-            options.binary_location = "/usr/bin/chromium"
+            CHROME_PATH = "/opt/chrome/chrome"
+            CHROMEDRIVER_PATH = "/usr/bin/chromedriver"
 
-            options.add_argument("--headless")  # stable on Amazon Linux
+            options.binary_location = CHROME_PATH
+
+            options.add_argument("--headless=new")
             options.add_argument("--no-sandbox")
             options.add_argument("--disable-dev-shm-usage")
+            options.add_argument("--disable-gpu")
+            options.add_argument("--single-process")
+            options.add_argument("--remote-debugging-port=9222")
 
-            service = Service("/usr/bin/chromedriver")
+            service = Service(CHROMEDRIVER_PATH)
+
 
         else:
             if self.headless:
