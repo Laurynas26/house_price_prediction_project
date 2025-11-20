@@ -1,81 +1,62 @@
-# Base AWS Lambda Python 3.10 image
 FROM public.ecr.aws/lambda/python:3.10
 
-# -----------------------------
-# Install system dependencies
-# -----------------------------
+# Install dependencies
 RUN yum -y update && \
     yum install -y \
-        unzip \
-        wget \
-        nss \
-        freetype \
-        fontconfig \
-        alsa-lib \
-        atk \
-        cups-libs \
-        gtk3 \
-        GConf2 \
-        xdg-utils \
-        libX11 \
-        libXcomposite \
-        libXcursor \
-        libXdamage \
-        libXext \
-        libXi \
-        libXrandr \
-        libXScrnSaver \
-        libXtst \
-        pango \
-    && yum clean all
+      unzip \
+      wget \
+      nss \
+      freetype \
+      fontconfig \
+      alsa-lib \
+      atk \
+      cups-libs \
+      gtk3 \
+      GConf2 \
+      xdg-utils \
+      libX11 \
+      libXcomposite \
+      libXcursor \
+      libXdamage \
+      libXext \
+      libXi \
+      libXrandr \
+      libXScrnSaver \
+      libXtst \
+      pango \
+  && yum clean all
 
-# -----------------------------
-# Install Chromium (version 128)
-# -----------------------------
-RUN wget -O chrome.zip \
-    https://storage.googleapis.com/chrome-for-testing-public/128.0.6613.137/linux64/chrome-linux64.zip && \
-    unzip chrome.zip && \
-    mv chrome-linux64 /opt/chrome && \
-    rm chrome.zip
+# Download Sparticuz Chromium
+RUN wget -O /tmp/chromium.tar.br \
+    https://github.com/Sparticuz/chromium/releases/download/v141.0.0/chromium-v141.0.0-pack.tar.br && \
+    mkdir -p /opt/chromium && \
+    tar --use-compress-program=pbzip2 -xvf /tmp/chromium.tar.br -C /opt/chromium && \
+    rm /tmp/chromium.tar.br
 
-# -----------------------------
-# Install matching Chromedriver
-# -----------------------------
-RUN wget -O chromedriver.zip \
-    https://storage.googleapis.com/chrome-for-testing-public/128.0.6613.137/linux64/chromedriver-linux64.zip && \
-    unzip chromedriver.zip && \
-    mv chromedriver-linux64/chromedriver /usr/bin/chromedriver && \
+# Download matching chromedriver
+RUN wget -O /tmp/chromedriver.zip \
+    https://github.com/Sparticuz/chromium/releases/download/v141.0.0/chromedriver-v141.0.0-linux64.zip && \
+    unzip /tmp/chromedriver.zip -d /opt && \
+    mv /opt/chromedriver /usr/bin/chromedriver && \
     chmod +x /usr/bin/chromedriver && \
-    rm -rf chromedriver-linux64 chromedriver.zip
+    rm /tmp/chromedriver.zip
 
-# -----------------------------
-# Set environment variables for Selenium
-# -----------------------------
-ENV CHROME_PATH="/opt/chrome/chrome"
+# Set environment variables
+ENV CHROME_PATH="/opt/chromium/chrome"
 ENV CHROMEDRIVER_PATH="/usr/bin/chromedriver"
-ENV PATH="$PATH:/opt/chrome:/usr/bin"
+ENV PATH="$PATH:/opt/chromium:/usr/bin"
 
-# -----------------------------
 # Working directory
-# -----------------------------
 WORKDIR ${LAMBDA_TASK_ROOT}
 
-# -----------------------------
-# Copy code and config
-# -----------------------------
+# Copy code
 COPY src/aws_lambda/ ${LAMBDA_TASK_ROOT}/
 COPY src/ ${LAMBDA_TASK_ROOT}/src/
 COPY config/ ${LAMBDA_TASK_ROOT}/config/
 
-# -----------------------------
-# Install Python dependencies
-# -----------------------------
+# Python dependencies
 COPY src/aws_lambda/requirements_aws_lambda.txt .
-
 RUN pip install --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir "numpy<2" -r requirements_aws_lambda.txt
+    pip install --no-cache-dir -r requirements_aws_lambda.txt
 
-# -----------------------------
-# Lambda handler
-# -----------------------------
 CMD ["lambda_function.lambda_handler"]
