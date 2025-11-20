@@ -1,9 +1,11 @@
+# Base AWS Lambda Python 3.10 image
 FROM public.ecr.aws/lambda/python:3.10
 
-# Install dependencies
+# -----------------------------
+# Install system dependencies
+# -----------------------------
 RUN yum -y update && \
     yum install -y \
-        tar \
         unzip \
         wget \
         nss \
@@ -27,34 +29,53 @@ RUN yum -y update && \
         pango \
     && yum clean all
 
+# -----------------------------
+# Install Chromium (version 128)
+# -----------------------------
+RUN wget -O chrome.zip \
+    https://storage.googleapis.com/chrome-for-testing-public/128.0.6613.137/linux64/chrome-linux64.zip && \
+    unzip chrome.zip && \
+    mv chrome-linux64 /opt/chrome && \
+    rm chrome.zip
 
-# Download Sparticuz Chromium + Chromedriver
-RUN wget -O /tmp/chromium.zip \
-    https://github.com/Sparticuz/chromium/releases/download/v141.0.0/chromium-v141.0.0-layer.x64.zip && \
-    mkdir -p /opt/chromium && \
-    unzip /tmp/chromium.zip -d /opt/chromium && \
-    rm /tmp/chromium.zip
+# -----------------------------
+# Install matching Chromedriver
+# -----------------------------
+RUN wget -O chromedriver.zip \
+    https://storage.googleapis.com/chrome-for-testing-public/128.0.6613.137/linux64/chromedriver-linux64.zip && \
+    unzip chromedriver.zip && \
+    mv chromedriver-linux64/chromedriver /usr/bin/chromedriver && \
+    chmod +x /usr/bin/chromedriver && \
+    rm -rf chromedriver-linux64 chromedriver.zip
 
-# Make chromedriver executable
-RUN chmod +x /opt/chromium/chromedriver/chromedriver && \
-    mv /opt/chromium/chromedriver/chromedriver /usr/bin/chromedriver
-
-
-# Set environment variables
-ENV CHROME_PATH="/opt/chromium/chrome/chrome"
+# -----------------------------
+# Set environment variables for Selenium
+# -----------------------------
+ENV CHROME_PATH="/opt/chrome/chrome"
 ENV CHROMEDRIVER_PATH="/usr/bin/chromedriver"
+ENV PATH="$PATH:/opt/chrome:/usr/bin"
 
+# -----------------------------
 # Working directory
+# -----------------------------
 WORKDIR ${LAMBDA_TASK_ROOT}
 
-# Copy code
+# -----------------------------
+# Copy code and config
+# -----------------------------
 COPY src/aws_lambda/ ${LAMBDA_TASK_ROOT}/
 COPY src/ ${LAMBDA_TASK_ROOT}/src/
 COPY config/ ${LAMBDA_TASK_ROOT}/config/
 
-# Python dependencies
+# -----------------------------
+# Install Python dependencies
+# -----------------------------
 COPY src/aws_lambda/requirements_aws_lambda.txt .
-RUN pip install --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir -r requirements_aws_lambda.txt
 
+RUN pip install --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir "numpy<2" -r requirements_aws_lambda.txt
+
+# -----------------------------
+# Lambda handler
+# -----------------------------
 CMD ["lambda_function.lambda_handler"]
