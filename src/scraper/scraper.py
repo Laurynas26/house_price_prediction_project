@@ -83,37 +83,34 @@ class FundaScraper:
         options.add_argument("--disable-blink-features=AutomationControlled")
         options.add_argument("--log-level=3")
 
+        # ----------------------------
+        # AWS Lambda mode
+        # ----------------------------
         if os.environ.get("LAMBDA_TASK_ROOT"):
-            # Lambda-specific options
-            options.add_argument("--headless=old")
+
+            # Use new Chrome binary + Chromedriver from Dockerfile
+            options.binary_location = "/opt/chrome/chrome"
+
+            # Required Lambda flags
+            options.add_argument("--headless=new")
             options.add_argument("--no-sandbox")
             options.add_argument("--disable-dev-shm-usage")
+            options.add_argument("--single-process")
             options.add_argument("--remote-debugging-port=9222")
+
+            service = Service("/usr/bin/chromedriver")
+
+        # ----------------------------
+        # Local development mode
+        # ----------------------------
         else:
-            # Local
             if self.headless:
                 options.add_argument("--headless=new")
 
+            # Auto-locate local chromedriver
+            service = Service()
+
         try:
-            if os.environ.get("LAMBDA_TASK_ROOT"):
-                # AWS Lambda paths (Amazon Linux)
-                CHROME_PATH = "/usr/bin/chromium-browser"
-                CHROMEDRIVER_PATH = "/usr/bin/chromedriver"
-
-                options.binary_location = CHROME_PATH
-                options.add_argument("--headless=old")
-                options.add_argument("--no-sandbox")
-                options.add_argument("--disable-dev-shm-usage")
-                options.add_argument("--disable-gpu")
-                options.add_argument("--single-process")
-                options.add_argument("--remote-debugging-port=9222")
-
-                service = Service(CHROMEDRIVER_PATH)
-
-            else:
-                # Local machine (uses system-installed Chrome + chromedriver)
-                service = Service()  # auto-resolves chromedriver in PATH
-
             self.driver = webdriver.Chrome(service=service, options=options)
 
         except Exception as e:

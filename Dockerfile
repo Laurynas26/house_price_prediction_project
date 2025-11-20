@@ -2,26 +2,21 @@
 FROM public.ecr.aws/lambda/python:3.10
 
 # -----------------------------
-# Install system dependencies for Chromium and Selenium
+# Install system dependencies
 # -----------------------------
 RUN yum -y update && \
     yum install -y \
-        chromium \
+        unzip \
+        wget \
         nss \
         freetype \
         fontconfig \
         alsa-lib \
         atk \
+        cups-libs \
         gtk3 \
-        ipa-gothic-fonts \
-        wget \
-        unzip \
-        xorg-x11-fonts-100dpi \
-        xorg-x11-fonts-75dpi \
-        xorg-x11-utils \
-        xorg-x11-fonts-cyrillic \
-        xorg-x11-fonts-Type1 \
-        xorg-x11-fonts-misc \
+        GConf2 \
+        xdg-utils \
         libX11 \
         libXcomposite \
         libXcursor \
@@ -31,24 +26,42 @@ RUN yum -y update && \
         libXrandr \
         libXScrnSaver \
         libXtst \
-        libXxf86vm \
-        cups-libs \
         pango \
-        GConf2 \
-        gtk2 \
-        gtk3 \
-        libxkbfile \
-        mesa-libOSMesa \
-        xdg-utils \
     && yum clean all
 
 # -----------------------------
-# Set working directory
+# Install Chromium (version 128)
+# -----------------------------
+RUN wget -O chrome.zip \
+    https://storage.googleapis.com/chrome-for-testing-public/128.0.6613.137/linux64/chrome-linux64.zip && \
+    unzip chrome.zip && \
+    mv chrome-linux64 /opt/chrome && \
+    rm chrome.zip
+
+# -----------------------------
+# Install matching Chromedriver
+# -----------------------------
+RUN wget -O chromedriver.zip \
+    https://storage.googleapis.com/chrome-for-testing-public/128.0.6613.137/linux64/chromedriver-linux64.zip && \
+    unzip chromedriver.zip && \
+    mv chromedriver-linux64/chromedriver /usr/bin/chromedriver && \
+    chmod +x /usr/bin/chromedriver && \
+    rm -rf chromedriver-linux64 chromedriver.zip
+
+# -----------------------------
+# Set environment variables for Selenium
+# -----------------------------
+ENV CHROME_PATH="/opt/chrome/chrome"
+ENV CHROMEDRIVER_PATH="/usr/bin/chromedriver"
+ENV PATH="$PATH:/opt/chrome:/usr/bin"
+
+# -----------------------------
+# Working directory
 # -----------------------------
 WORKDIR ${LAMBDA_TASK_ROOT}
 
 # -----------------------------
-# Copy code and configuration
+# Copy code and config
 # -----------------------------
 COPY src/aws_lambda/ ${LAMBDA_TASK_ROOT}/
 COPY src/ ${LAMBDA_TASK_ROOT}/src/
@@ -59,16 +72,8 @@ COPY config/ ${LAMBDA_TASK_ROOT}/config/
 # -----------------------------
 COPY src/aws_lambda/requirements_aws_lambda.txt .
 
-# Ensure we install a compatible NumPy and add webdriver-manager
 RUN pip install --upgrade pip setuptools wheel && \
     pip install --no-cache-dir "numpy<2" -r requirements_aws_lambda.txt
-
-
-# -----------------------------
-# Set environment variables for headless Chromium
-# -----------------------------
-ENV PATH="/usr/bin/chromium:${PATH}"
-ENV CHROME_BIN="/usr/bin/chromium"
 
 # -----------------------------
 # Lambda handler
