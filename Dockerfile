@@ -27,11 +27,11 @@ RUN yum -y update && \
   && yum clean all
 
 # Download Sparticuz Chromium
-RUN wget -O /tmp/chromium.tar.br \
-    https://github.com/Sparticuz/chromium/releases/download/v141.0.0/chromium-v141.0.0-pack.tar.br && \
+RUN wget -O /tmp/chromium.tar \
+    https://github.com/Sparticuz/chromium/releases/download/v141.0.0/chromium-v141.0.0-pack.x64.tar && \
     mkdir -p /opt/chromium && \
-    tar --use-compress-program=pbzip2 -xvf /tmp/chromium.tar.br -C /opt/chromium && \
-    rm /tmp/chromium.tar.br
+    tar -xf /tmp/chromium.tar -C /opt/chromium && \
+    rm /tmp/chromium.tar
 
 # Download matching chromedriver
 RUN wget -O /tmp/chromedriver.zip \
