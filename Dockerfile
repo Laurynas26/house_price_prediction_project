@@ -3,28 +3,30 @@ FROM public.ecr.aws/lambda/python:3.10
 # Install dependencies
 RUN yum -y update && \
     yum install -y \
-      unzip \
-      wget \
-      nss \
-      freetype \
-      fontconfig \
-      alsa-lib \
-      atk \
-      cups-libs \
-      gtk3 \
-      GConf2 \
-      xdg-utils \
-      libX11 \
-      libXcomposite \
-      libXcursor \
-      libXdamage \
-      libXext \
-      libXi \
-      libXrandr \
-      libXScrnSaver \
-      libXtst \
-      pango \
-  && yum clean all
+        tar \
+        unzip \
+        wget \
+        nss \
+        freetype \
+        fontconfig \
+        alsa-lib \
+        atk \
+        cups-libs \
+        gtk3 \
+        GConf2 \
+        xdg-utils \
+        libX11 \
+        libXcomposite \
+        libXcursor \
+        libXdamage \
+        libXext \
+        libXi \
+        libXrandr \
+        libXScrnSaver \
+        libXtst \
+        pango \
+    && yum clean all
+
 
 # Download Sparticuz Chromium
 RUN wget -O /tmp/chromium.tar \
