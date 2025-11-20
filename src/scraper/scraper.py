@@ -83,36 +83,23 @@ class FundaScraper:
         options.add_argument("--disable-blink-features=AutomationControlled")
         options.add_argument("--log-level=3")
 
-        # ----------------------------
-        # AWS Lambda mode
-        # ----------------------------
         if os.environ.get("LAMBDA_TASK_ROOT"):
+            # Use Amazon Linux chromium
+            options.binary_location = "/usr/bin/chromium"
 
-            # Use new Chrome binary + Chromedriver from Dockerfile
-            options.binary_location = "/opt/chrome/chrome"
-
-            # Required Lambda flags
-            options.add_argument("--headless=new")
+            options.add_argument("--headless")  # stable on Amazon Linux
             options.add_argument("--no-sandbox")
             options.add_argument("--disable-dev-shm-usage")
-            options.add_argument("--single-process")
-            options.add_argument("--remote-debugging-port=9222")
 
             service = Service("/usr/bin/chromedriver")
 
-        # ----------------------------
-        # Local development mode
-        # ----------------------------
         else:
             if self.headless:
                 options.add_argument("--headless=new")
-
-            # Auto-locate local chromedriver
             service = Service()
 
         try:
             self.driver = webdriver.Chrome(service=service, options=options)
-
         except Exception as e:
             logging.error(f"Failed to start ChromeDriver: {e}")
             raise RuntimeError("ChromeDriver initialization failed.") from e
