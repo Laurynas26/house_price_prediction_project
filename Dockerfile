@@ -36,13 +36,13 @@ RUN wget -O /tmp/chromium.zip \
     rm /tmp/chromium.zip
 
 # Make chromedriver executable
-RUN chmod +x /opt/chromium/chromedriver && \
-    mv /opt/chromium/chromedriver /usr/bin/chromedriver
+RUN chmod +x /opt/chromium/chromedriver/chromedriver && \
+    mv /opt/chromium/chromedriver/chromedriver /usr/bin/chromedriver
+
 
 # Set environment variables
-ENV CHROME_PATH="/opt/chromium/chrome"
+ENV CHROME_PATH="/opt/chromium/chrome/chrome"
 ENV CHROMEDRIVER_PATH="/usr/bin/chromedriver"
-ENV PATH="$PATH:/opt/chromium:/usr/bin"
 
 # Working directory
 WORKDIR ${LAMBDA_TASK_ROOT}
