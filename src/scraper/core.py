@@ -78,7 +78,8 @@ def scrape_listing(
                         ContentType="application/json",
                     )
                     logging.info(
-                        f"[INFO] Saved HTML and JSON to S3: {html_key}, {json_key}"
+                        "[INFO] Saved HTML and JSON to S3:"
+                        f"{html_key}, {json_key}"
                     )
                 except Exception as e:
                     logging.warning(f"[WARN] Failed to save to S3: {e}")
