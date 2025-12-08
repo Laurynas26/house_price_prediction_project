@@ -1,3 +1,11 @@
+"""
+DEPRECATED ENDPOINTS — DO NOT USE IN EC2 SERVICE
+
+Kept for reference only.
+Preprocessing + prediction now live in AWS Lambda.
+"""
+
+
 from fastapi import APIRouter, HTTPException, Query
 from src.api.core.manager import PipelineManager
 
