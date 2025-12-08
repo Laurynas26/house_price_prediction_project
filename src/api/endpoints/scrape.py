@@ -9,7 +9,8 @@ def scrape_and_return(
     headless: bool = True
 ):
     """
-    Scrape a Funda listing and store parsed structured data with debug info in S3.
+    Scrape a Funda listing and store parsed structured data
+    with debug info in S3.
     """
     job_id, s3_key, error = scrape_and_store(url, headless)
 
