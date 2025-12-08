@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Query
-from src.scraper.core import scrape_listing
+from src.api.services.scrape_service import scrape_and_store
 
 router = APIRouter()
 
@@ -9,17 +9,15 @@ def scrape_and_return(
     headless: bool = True
 ):
     """
-    Scrape a Funda listing and return parsed structured data with debug info.
+    Scrape a Funda listing and store parsed structured data with debug info in S3.
     """
-    try:
-        result = scrape_listing(url, headless=headless)
-        return {
-            "url": url,
-            "success": result["success"],
-            "data": result["data"],
-            "error": result["error"],
-        }
-    except PermissionError as e:
-        raise HTTPException(status_code=403, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Scraping failed: {e}")
+    job_id, s3_key, error = scrape_and_store(url, headless)
+
+    if error:
+        raise HTTPException(status_code=400, detail=error)
+
+    return {
+        "job_id": job_id,
+        "s3_key": s3_key,
+        "status": "stored"
+    }
