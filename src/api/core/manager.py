@@ -7,7 +7,7 @@ import numpy as np
 import os
 
 from src.scraper.core import scrape_listing
-from src.features.preprocessing_pipeline import PreprocessingPipeline
+from src.features.preprocessing_pipeline import PreprocessingPipeline, ensure_all_categorical_columns
 from src.api.core.mlflow_utils import load_latest_mlflow_model
 
 RAW_JSON_PATTERN = Path(__file__).parents[3] / "data/parsed_json/*.json"
@@ -366,18 +366,15 @@ class PipelineManager:
             features = preprocess_result["features"]
 
         elif manual_input:
-            # Step 1: transform input
+            # Step 1: convert manual input into a DataFrame with expected columns
             df_manual = self.convert_data_from_manual_input(manual_input)
 
-            # Step 2: full preprocessing
-            preprocess_result = self.preprocess(
-                df_manual.iloc[0].to_dict(), drop_target=True
-            )
-            if not preprocess_result["success"]:
-                return preprocess_result
+            # Step 2: ensure all one-hot/categorical/facility columns exist
+            df_manual = ensure_all_categorical_columns(df_manual, self.pipeline.meta)
 
-            # Step 3: predict
-            features = preprocess_result["features"]
+            # Step 3: convert to dict for prediction
+            features = df_manual.iloc[0].to_dict()
+
 
         else:
             return {
