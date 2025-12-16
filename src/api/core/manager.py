@@ -7,7 +7,10 @@ import numpy as np
 import os
 
 from src.scraper.core import scrape_listing
-from src.features.preprocessing_pipeline import PreprocessingPipeline, ensure_all_categorical_columns
+from src.features.preprocessing_pipeline import (
+    PreprocessingPipeline,
+    ensure_all_categorical_columns,
+)
 from src.api.core.mlflow_utils import load_latest_mlflow_model
 
 RAW_JSON_PATTERN = Path(__file__).parents[3] / "data/parsed_json/*.json"
@@ -370,11 +373,12 @@ class PipelineManager:
             df_manual = self.convert_data_from_manual_input(manual_input)
 
             # Step 2: ensure all one-hot/categorical/facility columns exist
-            df_manual = ensure_all_categorical_columns(df_manual, self.pipeline.meta)
+            df_manual = ensure_all_categorical_columns(
+                df_manual, self.pipeline.meta
+            )
 
             # Step 3: convert to dict for prediction
             features = df_manual.iloc[0].to_dict()
-
 
         else:
             return {
