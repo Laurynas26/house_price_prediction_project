@@ -9,9 +9,14 @@ import os
 from src.scraper.core import scrape_listing
 from src.features.preprocessing_pipeline import (
     PreprocessingPipeline,
+    json_to_df_raw_strict,
+    preprocess_df,
+    impute_missing_values,
+    prepare_features_test,
     ensure_all_categorical_columns,
 )
 from src.api.core.mlflow_utils import load_latest_mlflow_model
+
 
 RAW_JSON_PATTERN = Path(__file__).parents[3] / "data/parsed_json/*.json"
 
@@ -344,7 +349,7 @@ class PipelineManager:
     ) -> Dict[str, Any]:
         """
         Full end-to-end: scrape → preprocess → predict OR
-        manual input → predict.
+        manual input → preprocess → predict.
 
         Args:
             url: Funda URL to scrape.
@@ -357,27 +362,62 @@ class PipelineManager:
         if not self._initialized:
             raise RuntimeError("PipelineManager not initialized.")
 
-        # --- Decide data source ---
         if url:
+            # --- Scraped listing ---
             scrape_result = self.scrape(url, headless=headless)
             if not scrape_result["success"]:
                 return scrape_result
             listing = scrape_result["data"]
+
             preprocess_result = self.preprocess(listing, drop_target=True)
             if not preprocess_result["success"]:
                 return preprocess_result
+
             features = preprocess_result["features"]
 
         elif manual_input:
-            # Step 1: convert manual input into a DataFrame with expected columns
-            df_manual = self.convert_data_from_manual_input(manual_input)
+            # --- Manual input ---
+            # Step 1: wrap manual input as a raw-listing DataFrame
+            df_manual = json_to_df_raw_strict(manual_input)
 
-            # Step 2: ensure all one-hot/categorical/facility columns exist
+            # Step 2: numeric preprocessing
+            cfg = self.pipeline.config_paths.get("preprocessing", {})
+            df_manual = preprocess_df(
+                df_manual,
+                drop_raw=cfg.get("drop_raw", True),
+                numeric_cols=cfg.get("numeric_cols", []),
+            )
+
+            # Step 3: impute missing values
+            df_manual = impute_missing_values(
+                df_manual, cfg.get("imputation", {})
+            )
+
+            # Step 4: generate all features (amenities, categorical, engineered)
+            df_manual = prepare_features_test(
+                df_manual,
+                meta=self.pipeline.meta,
+                use_geolocation=bool(self.pipeline.meta.get("geo_meta")),
+                use_amenities=bool(self.pipeline.meta.get("amenity_meta")),
+                amenities_df=self.pipeline.meta.get("amenities_df"),
+                amenity_radius_map=self.pipeline.meta.get(
+                    "amenity_radius_map"
+                ),
+                geo_cache_file=self.pipeline.meta.get("geo_cache_file"),
+            )
+
+            # Step 5: ensure all expected columns exist
             df_manual = ensure_all_categorical_columns(
                 df_manual, self.pipeline.meta
             )
+            for col in self.pipeline.expected_columns:
+                if col not in df_manual.columns:
+                    df_manual[col] = 0 if col.startswith("has_") else pd.NA
+            df_manual = df_manual.reindex(
+                columns=self.pipeline.expected_columns, fill_value=0
+            )
 
-            # Step 3: convert to dict for prediction
+            # Step 6: convert to dict for prediction
             features = df_manual.iloc[0].to_dict()
 
         else:
