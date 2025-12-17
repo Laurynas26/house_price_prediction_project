@@ -7,16 +7,8 @@ import numpy as np
 import os
 
 from src.scraper.core import scrape_listing
-from src.features.preprocessing_pipeline import (
-    PreprocessingPipeline,
-    json_to_df_raw_strict,
-    preprocess_df,
-    impute_missing_values,
-    prepare_features_test,
-    ensure_all_categorical_columns,
-)
+from src.features.preprocessing_pipeline import PreprocessingPipeline
 from src.api.core.mlflow_utils import load_latest_mlflow_model
-
 
 RAW_JSON_PATTERN = Path(__file__).parents[3] / "data/parsed_json/*.json"
 
@@ -349,7 +341,7 @@ class PipelineManager:
     ) -> Dict[str, Any]:
         """
         Full end-to-end: scrape → preprocess → predict OR
-        manual input → preprocess → predict.
+        manual input → predict.
 
         Args:
             url: Funda URL to scrape.
@@ -362,77 +354,30 @@ class PipelineManager:
         if not self._initialized:
             raise RuntimeError("PipelineManager not initialized.")
 
+        # --- Decide data source ---
         if url:
-            # --- Scraped listing ---
             scrape_result = self.scrape(url, headless=headless)
             if not scrape_result["success"]:
                 return scrape_result
             listing = scrape_result["data"]
-
             preprocess_result = self.preprocess(listing, drop_target=True)
             if not preprocess_result["success"]:
                 return preprocess_result
-
             features = preprocess_result["features"]
 
         elif manual_input:
-            # Wrap manual input as DataFrame
-            df_manual = json_to_df_raw_strict(manual_input)
+            # Step 1: transform input
+            df_manual = self.convert_data_from_manual_input(manual_input)
 
-            # Numeric preprocessing
-            cfg = self.pipeline.config_paths.get("preprocessing", {})
-            df_manual = preprocess_df(
-                df_manual,
-                drop_raw=cfg.get("drop_raw", True),
-                numeric_cols=cfg.get("numeric_cols", []),
+            # Step 2: full preprocessing
+            preprocess_result = self.preprocess(
+                df_manual.iloc[0].to_dict(), drop_target=True
             )
+            if not preprocess_result["success"]:
+                return preprocess_result
 
-            # Impute missing values
-            df_manual = impute_missing_values(
-                df_manual, cfg.get("imputation", {})
-            )
-
-            # Full feature engineering (amenities, categorical, geolocation, etc.)
-            df_manual = prepare_features_test(
-                df_manual,
-                meta=self.pipeline.meta,
-                use_geolocation=bool(self.pipeline.meta.get("geo_meta")),
-                use_amenities=bool(self.pipeline.meta.get("amenity_meta")),
-                amenities_df=self.pipeline.meta.get("amenities_df"),
-                amenity_radius_map=self.pipeline.meta.get(
-                    "amenity_radius_map"
-                ),
-                geo_cache_file=self.pipeline.meta.get("geo_cache_file"),
-            )
-
-            # Ensure all categorical columns exist
-            df_manual = ensure_all_categorical_columns(
-                df_manual, self.pipeline.meta
-            )
-
-            # --- Compute engineered/log features if missing ---
-            for log_col, base_col in [
-                ("log_size_num", "size_num"),
-                ("log_num_facilities", "num_facilities"),
-            ]:
-                if (
-                    log_col not in df_manual.columns
-                    and base_col in df_manual.columns
-                ):
-                    df_manual[log_col] = np.log1p(
-                        df_manual[base_col].fillna(0).astype(float)
-                    )
-
-            # Align with expected columns
-            for col in self.pipeline.expected_columns:
-                if col not in df_manual.columns:
-                    df_manual[col] = 0 if col.startswith("has_") else pd.NA
-            df_manual = df_manual.reindex(
-                columns=self.pipeline.expected_columns, fill_value=0
-            )
-
-            # Convert to dict for prediction
-            features = df_manual.iloc[0].to_dict()
+            # Step 3: predict
+            features = preprocess_result["features"]
 
         else:
             return {
