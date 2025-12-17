@@ -376,11 +376,10 @@ class PipelineManager:
             features = preprocess_result["features"]
 
         elif manual_input:
-            # --- Manual input ---
-            # Step 1: wrap manual input as a raw-listing DataFrame
+            # Wrap manual input as DataFrame
             df_manual = json_to_df_raw_strict(manual_input)
 
-            # Step 2: numeric preprocessing
+            # Numeric preprocessing
             cfg = self.pipeline.config_paths.get("preprocessing", {})
             df_manual = preprocess_df(
                 df_manual,
@@ -388,12 +387,12 @@ class PipelineManager:
                 numeric_cols=cfg.get("numeric_cols", []),
             )
 
-            # Step 3: impute missing values
+            # Impute missing values
             df_manual = impute_missing_values(
                 df_manual, cfg.get("imputation", {})
             )
 
-            # Step 4: generate all features (amenities, categorical, engineered)
+            # Full feature engineering (amenities, categorical, geolocation, etc.)
             df_manual = prepare_features_test(
                 df_manual,
                 meta=self.pipeline.meta,
@@ -406,10 +405,25 @@ class PipelineManager:
                 geo_cache_file=self.pipeline.meta.get("geo_cache_file"),
             )
 
-            # Step 5: ensure all expected columns exist
+            # Ensure all categorical columns exist
             df_manual = ensure_all_categorical_columns(
                 df_manual, self.pipeline.meta
             )
+
+            # --- Compute engineered/log features if missing ---
+            for log_col, base_col in [
+                ("log_size_num", "size_num"),
+                ("log_num_facilities", "num_facilities"),
+            ]:
+                if (
+                    log_col not in df_manual.columns
+                    and base_col in df_manual.columns
+                ):
+                    df_manual[log_col] = np.log1p(
+                        df_manual[base_col].fillna(0).astype(float)
+                    )
+
+            # Align with expected columns
             for col in self.pipeline.expected_columns:
                 if col not in df_manual.columns:
                     df_manual[col] = 0 if col.startswith("has_") else pd.NA
@@ -417,7 +431,7 @@ class PipelineManager:
                 columns=self.pipeline.expected_columns, fill_value=0
             )
 
-            # Step 6: convert to dict for prediction
+            # Convert to dict for prediction
             features = df_manual.iloc[0].to_dict()
 
         else:
