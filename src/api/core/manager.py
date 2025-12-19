@@ -9,9 +9,14 @@ import os
 from src.scraper.core import scrape_listing
 from src.features.preprocessing_pipeline import (
     PreprocessingPipeline,
-    ensure_all_categorical_columns,
 )
 from src.api.core.mlflow_utils import load_latest_mlflow_model
+from src.features.data_prep_for_modelling.data_preparation import (
+    load_geo_config,
+)
+from src.features.feature_engineering.location_feature_enrichment import (
+    load_cache,
+)
 
 RAW_JSON_PATTERN = Path(__file__).parents[3] / "data/parsed_json/*.json"
 
@@ -68,14 +73,17 @@ class PipelineManager:
             print("[Manager] Running on AWS Lambda: using S3 storage")
             use_s3 = True
             local_raw_pattern = None  # Lambda has no local JSON/CSV
-            load_cache = True
-            save_cache = False
+            should_load_pipeline_cache = True
+            should_save_pipeline_cache = False
+
         else:
             print("[Manager] Running locally: using local JSON files")
             use_s3 = False
             local_raw_pattern = str(RAW_JSON_PATTERN)
-            load_cache = True
-            save_cache = True
+
+            # IMPORTANT: force clean local run
+            should_load_pipeline_cache = False
+            should_save_pipeline_cache = True
 
         # ------------------------------
         # Create preprocessing pipeline
@@ -94,8 +102,8 @@ class PipelineManager:
                 "model_name",
                 "xgboost_early_stopping_optuna_feature_eng_geoloc_exp",
             ),
-            load_cache=load_cache,
-            save_cache=save_cache,
+            load_cache=should_load_pipeline_cache,
+            save_cache=should_save_pipeline_cache,
         )
 
         if running_on_lambda:
@@ -120,11 +128,35 @@ class PipelineManager:
                     "Run preprocessing locally and upload cache folder."
                 )
         else:
-            # Local environment → allow full pipeline
-            self.pipeline.run(smart_cache=True)
-            if self.pipeline.meta is None or self.pipeline.X_train is None:
-                print("[Manager] ⚠️ Cached pipeline incomplete, refitting...")
-                self.pipeline.run(smart_cache=False)
+            # Local environment → always rebuild pipeline for safety
+            print("[Manager] Local run → forcing full preprocessing")
+
+            # --- Run full preprocessing locally ---
+            self.pipeline.run(smart_cache=False)
+
+            # --- Load geo & amenities metadata (same as training) ---
+            geo_cache_file, amenities_df, amenity_radius_map = load_geo_config(
+                config_dir / "model_config.yaml"
+            )
+
+            lat_lon_cache = load_cache(geo_cache_file)
+
+            self.pipeline.meta.update(
+                {
+                    "geo_cache_file": geo_cache_file,
+                    "amenities_df": amenities_df,
+                    "amenity_radius_map": amenity_radius_map,
+                    "lat_lon_cache": lat_lon_cache,
+                    "use_amenities": amenities_df is not None,
+                    "use_geolocation": True,
+                }
+            )
+
+            print(
+                f"[Manager] Loaded geo metadata | "
+                f"Amenities: {amenities_df.shape if amenities_df is not None else None}, "
+                f"Lat/Lon cache size: {len(lat_lon_cache)}"
+            )
 
         # --- MLflow model loading ---
         production_model_name = model_cfg.get("production_model_name")
@@ -369,16 +401,13 @@ class PipelineManager:
             features = preprocess_result["features"]
 
         elif manual_input:
-            # Step 1: convert manual input into a DataFrame with expected columns
-            df_manual = self.convert_data_from_manual_input(manual_input)
+            listing = self.manual_input_to_listing(manual_input)
 
-            # Step 2: ensure all one-hot/categorical/facility columns exist
-            df_manual = ensure_all_categorical_columns(
-                df_manual, self.pipeline.meta
-            )
+            preprocess_result = self.preprocess(listing, drop_target=True)
+            if not preprocess_result["success"]:
+                return preprocess_result
 
-            # Step 3: convert to dict for prediction
-            features = df_manual.iloc[0].to_dict()
+            features = preprocess_result["features"]
 
         else:
             return {
@@ -391,3 +420,17 @@ class PipelineManager:
         # --- Predict ---
         prediction_result = self.predict(features)
         return prediction_result
+
+    def manual_input_to_listing(self, manual_input: dict) -> dict:
+        return {
+            "price": None,
+            "living_area": manual_input.get("size_num"),
+            "energy_label": manual_input.get("energy_label"),
+            "roof_type": manual_input.get("roof_type"),
+            "ownership_type": manual_input.get("ownership_type"),
+            "neighborhood": manual_input.get("neighborhood"),
+            "facilities": {
+                "garden": manual_input.get("has_garden", 0),
+                "balcony": manual_input.get("has_balcony", 0),
+            },
+        }
