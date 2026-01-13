@@ -8,7 +8,7 @@ CONFIG_DIR = Path(__file__).parents[1] / "config"
 
 # --- Example manual input for testing ---
 manual_input = {
-    "size_num": 100,
+    "size": 200,
     "num_facilities": 3,
     "energy_label": "D",
     "roof_type": "flat",
