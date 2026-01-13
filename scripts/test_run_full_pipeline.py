@@ -41,7 +41,7 @@ if result_url.get("success"):
 # Option 2: Run full pipeline from manual input
 # -------------------------
 manual_input = {
-    "size_num": 66,
+    "size": 66,
     "nr_rooms": 3,
     "bathrooms": 1,
     "toilets": 1,

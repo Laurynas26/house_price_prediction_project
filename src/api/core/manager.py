@@ -18,6 +18,35 @@ from src.features.feature_engineering.location_feature_enrichment import (
     load_cache,
 )
 
+EXPECTED_SCHEMA = {
+    "price": (None, (int, float, str, type(None))),
+    "contribution_vve": (None, (int, float, str, type(None))),
+    "size": (None, (int, float, str, type(None))),
+    "external_storage": (None, (int, float, str, type(None))),
+    "year_of_construction": (None, (int, float, str, type(None))),
+    "nr_rooms": (None, (int, float, str, type(None))),
+    "bathrooms": (None, (int, float, str, type(None))),
+    "toilets": (None, (int, float, str, type(None))),
+    "bedrooms": (None, (int, float, str, type(None))),
+    "facilities": ("", (str, list, type(None))),
+    "outdoor_features": ({}, (dict, type(None))),
+    "cadastral_parcels": ([], (list, type(None))),
+    "ownership_situations": ([], (list, type(None))),
+    "charges": ([], (list, type(None))),
+    "postal_code": (None, (str, type(None))),
+    "neighborhood_details": ({}, (dict, type(None))),
+    "address": (None, (str, type(None))),
+    "roof_type": (None, (str, type(None))),
+    "status": (None, (str, type(None))),
+    "ownership_type": (None, (str, type(None))),
+    "location": (None, (str, type(None))),
+    "energy_label": (None, (str, type(None))),
+    "located_on": (None, (str, type(None))),
+    "backyard": (None, (str, type(None))),
+    "balcony": (None, (str, type(None))),
+}
+
+
 RAW_JSON_PATTERN = Path(__file__).parents[3] / "data/parsed_json/*.json"
 
 S3_BUCKET = os.environ.get("S3_BUCKET")
@@ -421,16 +450,26 @@ class PipelineManager:
         prediction_result = self.predict(features)
         return prediction_result
 
+    # def manual_input_to_listing(self, manual_input: dict) -> dict:
+    #     return {
+    #         "price": None,
+    #         "living_area": manual_input.get("size_num"),
+    #         "energy_label": manual_input.get("energy_label"),
+    #         "roof_type": manual_input.get("roof_type"),
+    #         "ownership_type": manual_input.get("ownership_type"),
+    #         "neighborhood": manual_input.get("neighborhood"),
+    #         "facilities": {
+    #             "garden": manual_input.get("has_garden", 0),
+    #             "balcony": manual_input.get("has_balcony", 0),
+    #         },
+    #     }
     def manual_input_to_listing(self, manual_input: dict) -> dict:
-        return {
-            "price": None,
-            "living_area": manual_input.get("size_num"),
-            "energy_label": manual_input.get("energy_label"),
-            "roof_type": manual_input.get("roof_type"),
-            "ownership_type": manual_input.get("ownership_type"),
-            "neighborhood": manual_input.get("neighborhood"),
-            "facilities": {
-                "garden": manual_input.get("has_garden", 0),
-                "balcony": manual_input.get("has_balcony", 0),
-            },
-        }
+        """
+        Build a schema-safe listing dict from manual input.
+        """
+        listing = {}
+
+        for field, (default, _) in EXPECTED_SCHEMA.items():
+            listing[field] = manual_input.get(field, default)
+
+        return listing
