@@ -74,55 +74,52 @@ class PipelineManager:
     # -------------------------------------------------------------------------
     def initialize(self, config_dir: str):
         """
-        Load configs, run preprocessing pipeline, and load model.
-        Can be safely called multiple times (singleton).
-
-        Args:
-            config_dir: Directory with preprocessing_config.yaml
-            and model_config.yaml
+        Initialize preprocessing pipeline and ML model for inference.
+        Safe to call multiple times (singleton).
         """
+
         if self._initialized:
             print("[Manager] Already initialized, skipping re-initialization.")
             return self
 
         config_dir = Path(config_dir)
 
+        # ------------------------------------------------------------------
         # Load configs
+        # ------------------------------------------------------------------
         with open(config_dir / "preprocessing_config.yaml") as f:
             preprocessing_cfg = yaml.safe_load(f)
+
         with open(config_dir / "model_config.yaml") as f:
             model_cfg = yaml.safe_load(f)
 
-        # ------------------------------
+        # ------------------------------------------------------------------
         # Detect environment
-        # ------------------------------
-        running_on_lambda = "LAMBDA_TASK_ROOT" in os.environ
+        # ------------------------------------------------------------------
+        running_on_lambda = "AWS_LAMBDA_FUNCTION_NAME" in os.environ
 
         if running_on_lambda:
-            print("[Manager] Running on AWS Lambda: using S3 storage")
+            print("[Manager] Running on AWS Lambda")
             use_s3 = True
-            local_raw_pattern = None  # Lambda has no local JSON/CSV
-            should_load_pipeline_cache = True
-            should_save_pipeline_cache = False
-
+            raw_json_pattern = None
+            load_pipeline_cache = True
+            save_pipeline_cache = False
         else:
-            print("[Manager] Running locally: using local JSON files")
+            print("[Manager] Running locally: cache-only inference mode")
             use_s3 = False
-            local_raw_pattern = str(RAW_JSON_PATTERN)
+            raw_json_pattern = None
+            load_pipeline_cache = False
+            save_pipeline_cache = False
 
-            # IMPORTANT: force clean local run
-            should_load_pipeline_cache = False
-            should_save_pipeline_cache = True
-
-        # ------------------------------
-        # Create preprocessing pipeline
-        # ------------------------------
+        # ------------------------------------------------------------------
+        # Create preprocessing pipeline (NO execution here)
+        # ------------------------------------------------------------------
         self.pipeline = PreprocessingPipeline(
             config_paths={
                 "preprocessing": preprocessing_cfg,
                 "model": model_cfg,
             },
-            raw_json_pattern=local_raw_pattern,
+            raw_json_pattern=raw_json_pattern,
             use_s3=use_s3,
             s3_bucket=S3_BUCKET,
             s3_prefix=S3_PREFIX,
@@ -131,85 +128,77 @@ class PipelineManager:
                 "model_name",
                 "xgboost_early_stopping_optuna_feature_eng_geoloc_exp",
             ),
-            load_cache=should_load_pipeline_cache,
-            save_cache=should_save_pipeline_cache,
+            load_cache=load_pipeline_cache,
+            save_cache=save_pipeline_cache,
         )
 
-        if running_on_lambda:
-            print("[Manager] Lambda detected → loading inference cache only")
+        # ------------------------------------------------------------------
+        # Load inference_meta (UNHASHED, UN-SCOPED)
+        # ------------------------------------------------------------------
+        print("[Manager] Loading inference_meta directly")
 
-            # Load inference metadata (no scope/hash for inference_meta)
-            if self.pipeline.cache.exists("inference_meta"):
-                inference_meta = self.pipeline.cache.load("inference_meta")
-
-                self.pipeline.meta = inference_meta.get("meta")
-                self.pipeline.expected_columns = inference_meta.get(
-                    "expected_columns"
-                )
-
-                print(
-                    f"[Manager] Loaded inference metadata: "
-                    f"{len(self.pipeline.expected_columns)} expected columns"
-                )
-            else:
-                raise RuntimeError(
-                    "Running on Lambda but inference_meta cache not found. "
-                    "Run preprocessing locally and upload cache folder."
-                )
-        else:
-            # Local environment → always rebuild pipeline for safety
-            print("[Manager] Local run → forcing full preprocessing")
-
-            # --- Run full preprocessing locally ---
-            self.pipeline.run(smart_cache=False)
-
-            # --- Load geo & amenities metadata (same as training) ---
-            geo_cache_file, amenities_df, amenity_radius_map = load_geo_config(
-                config_dir / "model_config.yaml"
+        try:
+            inference_meta = self.pipeline.cache.load("inference_meta")
+        except FileNotFoundError:
+            raise RuntimeError(
+                "inference_meta.pkl not found.\n"
+                "You must generate it once during training preprocessing."
             )
 
-            lat_lon_cache = load_cache(geo_cache_file)
+        self.pipeline.meta = inference_meta["meta"]
+        self.pipeline.expected_columns = inference_meta["expected_columns"]
 
-            self.pipeline.meta.update(
-                {
-                    "geo_cache_file": geo_cache_file,
-                    "amenities_df": amenities_df,
-                    "amenity_radius_map": amenity_radius_map,
-                    "lat_lon_cache": lat_lon_cache,
-                    "use_amenities": amenities_df is not None,
-                    "use_geolocation": True,
-                }
-            )
+        print(
+            f"[Manager] Loaded inference_meta | "
+            f"{len(self.pipeline.expected_columns)} expected columns"
+        )
 
-            print(
-                f"[Manager] Loaded geo metadata | "
-                f"Amenities: {amenities_df.shape if amenities_df is not None else None}, "
-                f"Lat/Lon cache size: {len(lat_lon_cache)}"
-            )
+        # ------------------------------------------------------------------
+        # Load geo & amenities metadata (same as training)
+        # ------------------------------------------------------------------
+        from src.data_loading.geo_utils import load_cache, load_geo_config
 
-        # --- MLflow model loading ---
+        geo_cache_file, amenities_df, amenity_radius_map = load_geo_config(
+            config_dir / "model_config.yaml"
+        )
+
+        lat_lon_cache = load_cache(geo_cache_file)
+
+        self.pipeline.meta.update(
+            {
+                "geo_cache_file": geo_cache_file,
+                "amenities_df": amenities_df,
+                "amenity_radius_map": amenity_radius_map,
+                "lat_lon_cache": lat_lon_cache,
+                "use_amenities": amenities_df is not None,
+                "use_geolocation": True,
+            }
+        )
+
+        print(
+            f"[Manager] Geo loaded | "
+            f"Amenities: {amenities_df.shape if amenities_df is not None else None}, "
+            f"Lat/Lon cache size: {len(lat_lon_cache)}"
+        )
+
+        # ------------------------------------------------------------------
+        # Load ML model from MLflow
+        # ------------------------------------------------------------------
         production_model_name = model_cfg.get("production_model_name")
         if not production_model_name:
-            raise RuntimeError(
-                "Model name must be specified in model_config.yaml"
-            )
+            raise RuntimeError("production_model_name missing in model_config.yaml")
 
         experiment_name = "house_price_prediction"
-        try:
-            self.model = load_latest_mlflow_model(
-                production_model_name, experiment_name=experiment_name
-            )
-        except RuntimeError as e:
-            print("[Manager] MLflow error:", e)
-            print(
-                "Available MLflow folders:",
-                list((Path(__file__).parents[3] / "logs/mlruns").glob("*")),
-            )
-            raise
+
+        self.model = load_latest_mlflow_model(
+            production_model_name,
+            experiment_name=experiment_name,
+        )
 
         self._initialized = True
         print("[Manager] Pipeline and model initialized successfully.")
         return self
+
 
     # -------------------------------------------------------------------------
     # Scraping
