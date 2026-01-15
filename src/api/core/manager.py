@@ -14,6 +14,7 @@ from src.api.core.mlflow_utils import load_latest_mlflow_model
 from src.features.data_prep_for_modelling.data_preparation import (
     load_geo_config,
 )
+
 from src.features.feature_engineering.location_feature_enrichment import (
     load_cache,
 )
@@ -156,7 +157,6 @@ class PipelineManager:
         # ------------------------------------------------------------------
         # Load geo & amenities metadata (same as training)
         # ------------------------------------------------------------------
-        from src.data_loading.geo_utils import load_cache, load_geo_config
 
         geo_cache_file, amenities_df, amenity_radius_map = load_geo_config(
             config_dir / "model_config.yaml"
@@ -186,7 +186,9 @@ class PipelineManager:
         # ------------------------------------------------------------------
         production_model_name = model_cfg.get("production_model_name")
         if not production_model_name:
-            raise RuntimeError("production_model_name missing in model_config.yaml")
+            raise RuntimeError(
+                "production_model_name missing in model_config.yaml"
+            )
 
         experiment_name = "house_price_prediction"
 
@@ -198,7 +200,6 @@ class PipelineManager:
         self._initialized = True
         print("[Manager] Pipeline and model initialized successfully.")
         return self
-
 
     # -------------------------------------------------------------------------
     # Scraping

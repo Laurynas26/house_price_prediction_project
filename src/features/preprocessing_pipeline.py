@@ -128,7 +128,7 @@ class PreprocessingPipeline:
                 "expected_columns": self.X_train.columns.tolist(),
             }
             self.cache.save(
-                inference_meta, "inference_meta", scope=self.model_name
+                inference_meta, "inference_meta", config = None, scope=None
             )
             print(
                 "[CACHE] Saved inference_meta for future single listing"
