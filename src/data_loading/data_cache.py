@@ -23,7 +23,7 @@ class CacheManager:
 
     def __init__(
         self,
-        cache_dir: Union[str, Path] = "config/data/cache",
+        cache_dir: Union[str, Path] = "data/cache",
         use_timestamp: bool = False,
     ):
         self.s3_bucket = os.environ.get("CACHE_BUCKET")
