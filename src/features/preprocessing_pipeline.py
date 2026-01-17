@@ -128,7 +128,7 @@ class PreprocessingPipeline:
                 "expected_columns": self.X_train.columns.tolist(),
             }
             self.cache.save(
-                inference_meta, "inference_meta", config = None, scope=None
+                inference_meta, "inference_meta", config=None, scope=None
             )
             print(
                 "[CACHE] Saved inference_meta for future single listing"
@@ -275,18 +275,11 @@ class PreprocessingPipeline:
         feature DataFrame.
         Ensures schema consistency with training data.
         """
-        if (
-            not self.meta or getattr(self, "X_train", None) is None
-        ) and self.cache.exists("inference_meta", scope=self.model_name):
-            print("[INFO] Loading inference metadata from cache...")
-            inference_meta = self.cache.load(
-                "inference_meta", scope=self.model_name
-            )
-            self.meta = inference_meta["meta"]
-            self.expected_columns = inference_meta["expected_columns"]
-        elif not self.meta or getattr(self, "X_train", None) is None:
+        # --- Inference metadata must already be loaded by PipelineManager ---
+        if not self.meta or not getattr(self, "expected_columns", None):
             raise RuntimeError(
-                "Pipeline must be run first or inference cache missing."
+                "Inference metadata not initialized. "
+                "PipelineManager.initialize() must be called first."
             )
 
         df_raw = json_to_df_raw_strict(listing)

@@ -5,6 +5,8 @@ import xgboost as xgb
 import pandas as pd
 import numpy as np
 import os
+import pickle
+
 
 from src.scraper.core import scrape_listing
 from src.features.preprocessing_pipeline import (
@@ -136,15 +138,19 @@ class PipelineManager:
         # ------------------------------------------------------------------
         # Load inference_meta (UNHASHED, UN-SCOPED)
         # ------------------------------------------------------------------
-        print("[Manager] Loading inference_meta directly")
 
-        try:
-            inference_meta = self.pipeline.cache.load("inference_meta")
-        except FileNotFoundError:
+        print("[Manager] Loading inference_meta directly from disk")
+
+        inference_meta_path = Path("data/cache/inference_meta.pkl")
+
+        if not inference_meta_path.exists():
             raise RuntimeError(
-                "inference_meta.pkl not found.\n"
-                "You must generate it once during training preprocessing."
+                "inference_meta.pkl not found at data/cache/inference_meta.pkl\n"
+                "Generate it once during training preprocessing."
             )
+
+        with open(inference_meta_path, "rb") as f:
+            inference_meta = pickle.load(f)
 
         self.pipeline.meta = inference_meta["meta"]
         self.pipeline.expected_columns = inference_meta["expected_columns"]
@@ -153,6 +159,7 @@ class PipelineManager:
             f"[Manager] Loaded inference_meta | "
             f"{len(self.pipeline.expected_columns)} expected columns"
         )
+
 
         # ------------------------------------------------------------------
         # Load geo & amenities metadata (same as training)
