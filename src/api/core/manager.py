@@ -170,7 +170,17 @@ class PipelineManager:
             config_dir / "model_config.yaml"
         )
 
-        lat_lon_cache = load_cache(geo_cache_file)
+        # --- Resolve geo cache path relative to config_dir ---
+        geo_cache_path = config_dir / geo_cache_file
+
+        if not geo_cache_path.exists():
+            raise RuntimeError(
+                f"Geo cache file not found at {geo_cache_path}. "
+                "Ensure it is bundled in config/ for Lambda."
+            )
+
+        lat_lon_cache = load_cache(geo_cache_path)
+
 
         self.pipeline.meta.update(
             {
