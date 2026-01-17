@@ -22,7 +22,7 @@ manual_input = {
     # --- Core ---
     "price": None,
     "size": 100,
-    "contribution_vve": 150,
+    "contribution_vve": 250,
     "external_storage": 6,
     "year_of_construction": 1998,
     "nr_rooms": 4,
