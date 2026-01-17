@@ -145,7 +145,8 @@ class PipelineManager:
 
         if not inference_meta_path.exists():
             raise RuntimeError(
-                "inference_meta.pkl not found at data/cache/inference_meta.pkl\n"
+                "inference_meta.pkl not found at\n "
+                "data/cache/inference_meta.pkl\n"
                 "Generate it once during training preprocessing."
             )
 
@@ -159,7 +160,6 @@ class PipelineManager:
             f"[Manager] Loaded inference_meta | "
             f"{len(self.pipeline.expected_columns)} expected columns"
         )
-
 
         # ------------------------------------------------------------------
         # Load geo & amenities metadata (same as training)
@@ -184,7 +184,8 @@ class PipelineManager:
 
         print(
             f"[Manager] Geo loaded | "
-            f"Amenities: {amenities_df.shape if amenities_df is not None else None}, "
+            f"Amenities: "
+            f"{amenities_df.shape if amenities_df is not None else None}, "
             f"Lat/Lon cache size: {len(lat_lon_cache)}"
         )
 
