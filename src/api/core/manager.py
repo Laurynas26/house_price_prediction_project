@@ -141,7 +141,8 @@ class PipelineManager:
 
         print("[Manager] Loading inference_meta directly from disk")
 
-        inference_meta_path = Path("data/cache/inference_meta.pkl")
+        # inference_meta_path = Path("data/cache/inference_meta.pkl")
+        inference_meta_path = config_dir / "inference_meta.pkl"
 
         if not inference_meta_path.exists():
             raise RuntimeError(
