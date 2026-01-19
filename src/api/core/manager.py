@@ -12,6 +12,8 @@ from src.features.preprocessing_pipeline import (
     PreprocessingPipeline,
 )
 from src.api.core.mlflow_utils import load_latest_mlflow_model
+from src.api.core.schemas import build_listing_from_manual_input
+
 from src.features.data_prep_for_modelling.data_preparation import (
     load_geo_config,
 )
@@ -23,34 +25,6 @@ from src.features.feature_engineering.location_feature_enrichment import (
 import logging
 
 logger = logging.getLogger(__name__)
-
-EXPECTED_SCHEMA = {
-    "price": (None, (int, float, str, type(None))),
-    "contribution_vve": (None, (int, float, str, type(None))),
-    "size": (None, (int, float, str, type(None))),
-    "external_storage": (None, (int, float, str, type(None))),
-    "year_of_construction": (None, (int, float, str, type(None))),
-    "nr_rooms": (None, (int, float, str, type(None))),
-    "bathrooms": (None, (int, float, str, type(None))),
-    "toilets": (None, (int, float, str, type(None))),
-    "bedrooms": (None, (int, float, str, type(None))),
-    "facilities": ("", (str, list, type(None))),
-    "outdoor_features": ({}, (dict, type(None))),
-    "cadastral_parcels": ([], (list, type(None))),
-    "ownership_situations": ([], (list, type(None))),
-    "charges": ([], (list, type(None))),
-    "postal_code": (None, (str, type(None))),
-    "neighborhood_details": ({}, (dict, type(None))),
-    "address": (None, (str, type(None))),
-    "roof_type": (None, (str, type(None))),
-    "status": (None, (str, type(None))),
-    "ownership_type": (None, (str, type(None))),
-    "location": (None, (str, type(None))),
-    "energy_label": (None, (str, type(None))),
-    "located_on": (None, (str, type(None))),
-    "backyard": (None, (str, type(None))),
-    "balcony": (None, (str, type(None))),
-}
 
 
 RAW_JSON_PATTERN = Path(__file__).parents[3] / "data/parsed_json/*.json"
@@ -85,7 +59,10 @@ class PipelineManager:
         """
 
         if self._initialized:
-            logger.info("PipelineManager already initialized; skipping re-initialization")
+            logger.info(
+                "PipelineManager already initialized; " \
+                "skipping re-initialization"
+            )
             return self
 
         config_dir = Path(config_dir)
@@ -165,7 +142,6 @@ class PipelineManager:
             len(self.pipeline.expected_columns),
         )
 
-
         # ------------------------------------------------------------------
         # Load geo & amenities metadata (same as training)
         # ------------------------------------------------------------------
@@ -185,7 +161,6 @@ class PipelineManager:
 
         lat_lon_cache = load_cache(geo_cache_path)
 
-
         self.pipeline.meta.update(
             {
                 "geo_cache_file": geo_cache_file,
@@ -202,7 +177,6 @@ class PipelineManager:
             amenities_df.shape if amenities_df is not None else None,
             len(lat_lon_cache),
         )
-
 
         # ------------------------------------------------------------------
         # Load ML model from MLflow
@@ -271,7 +245,9 @@ class PipelineManager:
             logger.debug("Incoming listing keys: %s", list(listing.keys()))
 
             if "data" in listing:
-                logger.debug("Subkeys under 'data': %s", list(listing["data"].keys()))
+                logger.debug(
+                    "Subkeys under 'data': %s", list(listing["data"].keys())
+                )
 
             # If already preprocessed dict, skip reprocessing
             if "features" in listing:
@@ -348,7 +324,6 @@ class PipelineManager:
                 logger.warning("Missing features in input: %s", missing)
             if extra:
                 logger.warning("Extra features in input: %s", extra)
-
 
             features_df = features_df.reindex(
                 columns=model_features, fill_value=0
@@ -445,7 +420,7 @@ class PipelineManager:
             features = preprocess_result["features"]
 
         elif manual_input:
-            listing = self.manual_input_to_listing(manual_input)
+            listing = build_listing_from_manual_input(manual_input)
 
             preprocess_result = self.preprocess(listing, drop_target=True)
             if not preprocess_result["success"]:
@@ -464,27 +439,3 @@ class PipelineManager:
         # --- Predict ---
         prediction_result = self.predict(features)
         return prediction_result
-
-    # def manual_input_to_listing(self, manual_input: dict) -> dict:
-    #     return {
-    #         "price": None,
-    #         "living_area": manual_input.get("size_num"),
-    #         "energy_label": manual_input.get("energy_label"),
-    #         "roof_type": manual_input.get("roof_type"),
-    #         "ownership_type": manual_input.get("ownership_type"),
-    #         "neighborhood": manual_input.get("neighborhood"),
-    #         "facilities": {
-    #             "garden": manual_input.get("has_garden", 0),
-    #             "balcony": manual_input.get("has_balcony", 0),
-    #         },
-    #     }
-    def manual_input_to_listing(self, manual_input: dict) -> dict:
-        """
-        Build a schema-safe listing dict from manual input.
-        """
-        listing = {}
-
-        for field, (default, _) in EXPECTED_SCHEMA.items():
-            listing[field] = manual_input.get(field, default)
-
-        return listing
