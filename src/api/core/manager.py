@@ -7,7 +7,6 @@ import numpy as np
 import os
 import pickle
 
-
 from src.scraper.core import scrape_listing
 from src.features.preprocessing_pipeline import (
     PreprocessingPipeline,
@@ -20,6 +19,10 @@ from src.features.data_prep_for_modelling.data_preparation import (
 from src.features.feature_engineering.location_feature_enrichment import (
     load_cache,
 )
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 EXPECTED_SCHEMA = {
     "price": (None, (int, float, str, type(None))),
@@ -82,7 +85,7 @@ class PipelineManager:
         """
 
         if self._initialized:
-            print("[Manager] Already initialized, skipping re-initialization.")
+            logger.info("PipelineManager already initialized; skipping re-initialization")
             return self
 
         config_dir = Path(config_dir)
@@ -102,13 +105,13 @@ class PipelineManager:
         running_on_lambda = "AWS_LAMBDA_FUNCTION_NAME" in os.environ
 
         if running_on_lambda:
-            print("[Manager] Running on AWS Lambda")
+            logger.info("Running on AWS Lambda")
             use_s3 = True
             raw_json_pattern = None
             load_pipeline_cache = True
             save_pipeline_cache = False
         else:
-            print("[Manager] Running locally: cache-only inference mode")
+            logger.info("Running locally: cache-only inference mode")
             use_s3 = False
             raw_json_pattern = None
             load_pipeline_cache = False
@@ -139,7 +142,7 @@ class PipelineManager:
         # Load inference_meta (UNHASHED, UN-SCOPED)
         # ------------------------------------------------------------------
 
-        print("[Manager] Loading inference_meta directly from disk")
+        logger.info("Loading inference metadata from disk")
 
         # inference_meta_path = Path("data/cache/inference_meta.pkl")
         inference_meta_path = config_dir / "inference_meta.pkl"
@@ -157,10 +160,11 @@ class PipelineManager:
         self.pipeline.meta = inference_meta["meta"]
         self.pipeline.expected_columns = inference_meta["expected_columns"]
 
-        print(
-            f"[Manager] Loaded inference_meta | "
-            f"{len(self.pipeline.expected_columns)} expected columns"
+        logger.info(
+            "Loaded inference metadata (%d expected columns)",
+            len(self.pipeline.expected_columns),
         )
+
 
         # ------------------------------------------------------------------
         # Load geo & amenities metadata (same as training)
@@ -193,12 +197,12 @@ class PipelineManager:
             }
         )
 
-        print(
-            f"[Manager] Geo loaded | "
-            f"Amenities: "
-            f"{amenities_df.shape if amenities_df is not None else None}, "
-            f"Lat/Lon cache size: {len(lat_lon_cache)}"
+        logger.info(
+            "Geo metadata loaded | amenities shape=%s | lat/lon cache size=%d",
+            amenities_df.shape if amenities_df is not None else None,
+            len(lat_lon_cache),
         )
+
 
         # ------------------------------------------------------------------
         # Load ML model from MLflow
@@ -217,7 +221,7 @@ class PipelineManager:
         )
 
         self._initialized = True
-        print("[Manager] Pipeline and model initialized successfully.")
+        logger.info("Pipeline and model initialized successfully")
         return self
 
     # -------------------------------------------------------------------------
@@ -263,10 +267,11 @@ class PipelineManager:
             raise RuntimeError("PipelineManager not initialized.")
 
         try:
-            print("=== Incoming /preprocess request ===")
-            print("Incoming listing keys:", list(listing.keys()))
+            logger.debug("Incoming preprocess request")
+            logger.debug("Incoming listing keys: %s", list(listing.keys()))
+
             if "data" in listing:
-                print("Subkeys under 'data':", list(listing["data"].keys()))
+                logger.debug("Subkeys under 'data': %s", list(listing["data"].keys()))
 
             # If already preprocessed dict, skip reprocessing
             if "features" in listing:
@@ -288,12 +293,10 @@ class PipelineManager:
             return {"success": True, "features": features_dict, "error": None}
 
         except Exception as e:
-            import traceback
-
-            print("\n--- ERROR INSIDE manager.preprocess ---")
-            print(f"Type: {type(e)}")
-            print(f"Message: {e}")
-            traceback.print_exc(limit=10)
+            logger.error(
+                "Error during preprocessing",
+                exc_info=True,
+            )
             return {"success": False, "features": None, "error": str(e)}
 
     # -------------------------------------------------------------------------
@@ -341,9 +344,11 @@ class PipelineManager:
             missing = [f for f in model_features if f not in df_features]
             extra = [f for f in df_features if f not in model_features]
 
-            if missing or extra:
-                print(f"[DEBUG] Missing in input: {missing}")
-                print(f"[DEBUG] Extra in input: {extra}")
+            if missing:
+                logger.warning("Missing features in input: %s", missing)
+            if extra:
+                logger.warning("Extra features in input: %s", extra)
+
 
             features_df = features_df.reindex(
                 columns=model_features, fill_value=0
@@ -354,10 +359,11 @@ class PipelineManager:
                 exclude=["number", "bool"]
             ).columns
             if len(non_numeric) > 0:
-                print(
-                    f"[INFO] Dropping non-numeric columns before "
-                    f"prediction: {list(non_numeric)}"
+                logger.info(
+                    "Dropping non-numeric columns before prediction: %s",
+                    list(non_numeric),
                 )
+
                 features_df = features_df.drop(columns=non_numeric)
 
             # --- Run prediction ---
