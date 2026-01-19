@@ -6,6 +6,16 @@ import os
 
 from src.api.core.manager import PipelineManager
 
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s - %(message)s",
+)
+
+logger = logging.getLogger(__name__)
+
+
 # --- Cold-start singleton: keep manager in memory ---
 manager = PipelineManager()
 ROOT = Path(os.environ["LAMBDA_TASK_ROOT"])
@@ -29,10 +39,14 @@ def initialize_pipeline():
     manager.pipeline.meta["amenities_df"] = pd.read_csv(
         CONFIG_DIR / geo_cfg.get("amenities_file")
     )
-    manager.pipeline.meta["amenity_radius_map"] = geo_cfg.get("amenity_radius_map")
-    manager.pipeline.meta["geo_cache_file"] = str(CONFIG_DIR / geo_cfg.get("geo_cache_file"))
+    manager.pipeline.meta["amenity_radius_map"] = geo_cfg.get(
+        "amenity_radius_map"
+    )
+    manager.pipeline.meta["geo_cache_file"] = str(
+        CONFIG_DIR / geo_cfg.get("geo_cache_file")
+    )
     manager.pipeline_initialized = True
-    print("[Lambda] PipelineManager initialized")
+    logger.info("PipelineManager initialized")
 
 
 def lambda_handler(event, context):
@@ -71,7 +85,12 @@ def lambda_handler(event, context):
             )
             return {"statusCode": 200, "body": json.dumps(result)}
         else:
-            return {"statusCode": 400, "body": json.dumps({"error": "Provide either 'url' or 'manual_input'"})}
+            return {
+                "statusCode": 400,
+                "body": json.dumps(
+                    {"error": "Provide either 'url' or 'manual_input'"}
+                ),
+            }
 
     except Exception as e:
         return {"statusCode": 500, "body": json.dumps({"error": str(e)})}
