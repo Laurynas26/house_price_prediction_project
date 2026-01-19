@@ -11,7 +11,7 @@ from src.scraper.core import scrape_listing
 from src.features.preprocessing_pipeline import (
     PreprocessingPipeline,
 )
-from src.api.core.mlflow_utils import load_latest_mlflow_model
+from src.api.core.mlflow_utils import load_production_model
 from src.api.core.schemas import build_listing_from_manual_input
 
 from src.features.data_prep_for_modelling.data_preparation import (
@@ -60,7 +60,7 @@ class PipelineManager:
 
         if self._initialized:
             logger.info(
-                "PipelineManager already initialized; " \
+                "PipelineManager already initialized; "
                 "skipping re-initialization"
             )
             return self
@@ -181,18 +181,8 @@ class PipelineManager:
         # ------------------------------------------------------------------
         # Load ML model from MLflow
         # ------------------------------------------------------------------
-        production_model_name = model_cfg.get("production_model_name")
-        if not production_model_name:
-            raise RuntimeError(
-                "production_model_name missing in model_config.yaml"
-            )
 
-        experiment_name = "house_price_prediction"
-
-        self.model = load_latest_mlflow_model(
-            production_model_name,
-            experiment_name=experiment_name,
-        )
+        self.model = load_production_model(model_cfg)
 
         self._initialized = True
         logger.info("Pipeline and model initialized successfully")
