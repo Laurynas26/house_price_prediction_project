@@ -261,6 +261,10 @@ class PipelineManager:
             "error": result.get("error"),
         }
 
+    # -------------------------------------------------------------------------
+    # Preprocessing
+    # -------------------------------------------------------------------------
+
     def _extract_features_from_listing(
         self,
         listing: Dict[str, Any],
@@ -321,9 +325,6 @@ class PipelineManager:
 
         return None
 
-    # -------------------------------------------------------------------------
-    # Preprocessing
-    # -------------------------------------------------------------------------
     def preprocess(
         self, listing: Dict[str, Any], drop_target: bool = True
     ) -> Dict[str, Any]:
@@ -368,10 +369,116 @@ class PipelineManager:
     # -------------------------------------------------------------------------
     # Prediction
     # -------------------------------------------------------------------------
+
+    def _to_feature_dataframe(self, features: Dict[str, Any]) -> pd.DataFrame:
+        """
+        Convert input features into a single-row DataFrame.
+
+        Args:
+            features: Feature dictionary or DataFrame-like object.
+
+        Returns:
+            Single-row pandas DataFrame.
+        """
+        if isinstance(features, dict):
+            return pd.DataFrame([features])
+
+        return pd.DataFrame(features)
+
+    def _get_model_feature_names(self) -> list[str]:
+        """
+        Extract feature names expected by the trained model.
+
+        Returns:
+            List of feature names.
+
+        Raises:
+            ValueError if feature names cannot be determined.
+        """
+        if hasattr(self.model, "feature_names"):
+            return list(self.model.feature_names)
+
+        if hasattr(self.model, "get_attr"):
+            feature_names = self.model.get_attr("feature_names")
+            if feature_names:
+                return list(feature_names)
+
+        raise ValueError("Cannot extract feature names from model.")
+
+    def _align_features_to_model(
+        self,
+        features_df: pd.DataFrame,
+        model_features: list[str],
+    ) -> pd.DataFrame:
+        """
+        Align input features to model's expected feature order.
+
+        Logs missing and extra features.
+
+        Args:
+            features_df: Input feature DataFrame.
+            model_features: Feature names expected by the model.
+
+        Returns:
+            Aligned DataFrame.
+        """
+        input_features = features_df.columns.tolist()
+
+        missing = [f for f in model_features if f not in input_features]
+        extra = [f for f in input_features if f not in model_features]
+
+        if missing:
+            logger.warning("Missing features in input: %s", missing)
+        if extra:
+            logger.warning("Extra features in input: %s", extra)
+
+        return features_df.reindex(columns=model_features, fill_value=0)
+
+    def _sanitize_numeric_features(
+        self, features_df: pd.DataFrame
+    ) -> pd.DataFrame:
+        """
+        Drop non-numeric columns before prediction.
+
+        Args:
+            features_df: Feature DataFrame.
+
+        Returns:
+            Numeric-only DataFrame.
+        """
+        non_numeric = features_df.select_dtypes(
+            exclude=["number", "bool"]
+        ).columns
+
+        if len(non_numeric) > 0:
+            logger.info(
+                "Dropping non-numeric columns before prediction: %s",
+                list(non_numeric),
+            )
+            features_df = features_df.drop(columns=non_numeric)
+
+        return features_df
+    
+    def _run_model_prediction(self, features_df: pd.DataFrame) -> float:
+        """
+        Run model prediction and undo log-transform if applicable.
+
+        Args:
+            features_df: Aligned numeric feature DataFrame.
+
+        Returns:
+            Predicted price value.
+        """
+        dmatrix = xgb.DMatrix(features_df)
+        raw_pred = float(self.model.predict(dmatrix)[0])
+
+        # Undo log-transform
+        return np.expm1(raw_pred)
+
+
     def predict(self, features: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Predict price from preprocessed features
-        (dict aligned with training columns).
+        Predict price from preprocessed features.
 
         Returns:
         {
@@ -385,62 +492,19 @@ class PipelineManager:
             raise RuntimeError("PipelineManager not initialized.")
 
         try:
-            # Convert dict -> DataFrame
-            if isinstance(features, dict):
-                features_df = pd.DataFrame([features])
-            else:
-                features_df = pd.DataFrame(features)
+            features_df = self._to_feature_dataframe(features)
 
-            # --- Get model feature names ---
-            model_features = (
-                self.model.feature_names
-                if hasattr(self.model, "feature_names")
-                else (
-                    self.model.get_attr("feature_names")
-                    if hasattr(self.model, "get_attr")
-                    else None
-                )
+            model_features = self._get_model_feature_names()
+            features_df = self._align_features_to_model(
+                features_df, model_features
             )
+            features_df = self._sanitize_numeric_features(features_df)
 
-            if model_features is None:
-                raise ValueError("Cannot extract feature names from model.")
-
-            # --- Align columns ---
-            df_features = features_df.columns.tolist()
-            missing = [f for f in model_features if f not in df_features]
-            extra = [f for f in df_features if f not in model_features]
-
-            if missing:
-                logger.warning("Missing features in input: %s", missing)
-            if extra:
-                logger.warning("Extra features in input: %s", extra)
-
-            features_df = features_df.reindex(
-                columns=model_features, fill_value=0
-            )
-
-            # --- Drop any non-numeric columns ---
-            non_numeric = features_df.select_dtypes(
-                exclude=["number", "bool"]
-            ).columns
-            if len(non_numeric) > 0:
-                logger.info(
-                    "Dropping non-numeric columns before prediction: %s",
-                    list(non_numeric),
-                )
-
-                features_df = features_df.drop(columns=non_numeric)
-
-            # --- Run prediction ---
-            dmatrix = xgb.DMatrix(features_df)
-            raw_pred = float(self.model.predict(dmatrix)[0])
-
-            # Undo log-transform if applicable
-            pred_value = np.expm1(raw_pred)
+            prediction = self._run_model_prediction(features_df)
 
             return {
                 "success": True,
-                "prediction": pred_value,
+                "prediction": prediction,
                 "features": features_df.to_dict(orient="records")[0],
                 "error": None,
             }
