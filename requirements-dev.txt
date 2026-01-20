@@ -6,3 +6,5 @@ flake8
 mypy
 isort
 pre-commit
+numpy
+pandas
