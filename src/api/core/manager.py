@@ -450,20 +450,26 @@ class PipelineManager:
 
         return features_df
 
+    def _resolve_model_schema(self) -> list[str]:
+        if hasattr(self.model, "feature_names") and self.model.feature_names:
+            return list(self.model.feature_names)
+
+        raise RuntimeError("Model does not expose feature names.")
+
     def _enforce_model_schema(
         self,
         features_df: pd.DataFrame,
     ) -> pd.DataFrame:
         """
-        Enforce training-time feature schema and column order.
+        Enforce model-time feature schema and column order.
         Drops any extra columns and fills missing ones with 0.
 
         This MUST be the final transformation before prediction.
         """
-        schema = self.pipeline.expected_columns
+        model_schema = self._resolve_model_schema()
 
         return features_df.reindex(
-            columns=schema,
+            columns=model_schema,
             fill_value=0,
         )
 
