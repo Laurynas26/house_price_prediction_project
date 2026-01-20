@@ -261,6 +261,66 @@ class PipelineManager:
             "error": result.get("error"),
         }
 
+    def _extract_features_from_listing(
+        self,
+        listing: Dict[str, Any],
+        drop_target: bool,
+    ) -> Dict[str, Any]:
+        """
+        Run preprocessing pipeline on a single listing and
+        return a flat feature dictionary.
+
+        Args:
+            listing: Raw listing dictionary.
+            drop_target: Whether to drop target column.
+
+        Returns:
+            Dictionary of processed features.
+
+        Raises:
+            ValueError if preprocessing produces no output.
+        """
+        df_result = self.pipeline.preprocess_single(
+            listing, drop_target=drop_target
+        )
+
+        if isinstance(df_result, pd.DataFrame):
+            if df_result.empty:
+                raise ValueError("Preprocessed DataFrame is empty.")
+            return df_result.iloc[0].to_dict()
+
+        return dict(df_result)
+
+    def _log_preprocess_input(self, listing: Dict[str, Any]):
+        """
+        Log useful debug information about incoming listing structure.
+        """
+        logger.debug("Incoming preprocess request")
+        logger.debug("Incoming listing keys: %s", list(listing.keys()))
+
+        if "data" in listing and isinstance(listing["data"], dict):
+            logger.debug(
+                "Subkeys under 'data': %s", list(listing["data"].keys())
+            )
+
+    def _normalize_preprocess_input(
+        self,
+        listing: Dict[str, Any],
+    ) -> Dict[str, Any] | None:
+        """
+        Detect whether listing already contains preprocessed features.
+
+        Returns:
+            Feature dictionary if already preprocessed, else None.
+        """
+        if "features" in listing:
+            logger.info(
+                "Listing already contains features; skipping preprocessing"
+            )
+            return listing["features"]
+
+        return None
+
     # -------------------------------------------------------------------------
     # Preprocessing
     # -------------------------------------------------------------------------
@@ -269,10 +329,11 @@ class PipelineManager:
     ) -> Dict[str, Any]:
         """
         Preprocess a single listing dict using the fitted pipeline.
-        Returns a dict with structure:
+
+        Returns:
         {
             "success": bool,
-            "features": dict,
+            "features": dict or None,
             "error": str or None
         }
         """
@@ -280,39 +341,29 @@ class PipelineManager:
             raise RuntimeError("PipelineManager not initialized.")
 
         try:
-            logger.debug("Incoming preprocess request")
-            logger.debug("Incoming listing keys: %s", list(listing.keys()))
+            self._log_preprocess_input(listing)
 
-            if "data" in listing:
-                logger.debug(
-                    "Subkeys under 'data': %s", list(listing["data"].keys())
+            # Case 1: already preprocessed
+            features = self._normalize_preprocess_input(listing)
+            if features is None:
+                features = self._extract_features_from_listing(
+                    listing=listing,
+                    drop_target=drop_target,
                 )
 
-            # If already preprocessed dict, skip reprocessing
-            if "features" in listing:
-                features_dict = listing["features"]
-            else:
-                df_result = self.pipeline.preprocess_single(
-                    listing, drop_target=drop_target
-                )
-
-                # Safely convert to dict
-                if isinstance(df_result, pd.DataFrame):
-                    if not df_result.empty:
-                        features_dict = df_result.iloc[0].to_dict()
-                    else:
-                        raise ValueError("Preprocessed DataFrame is empty.")
-                else:
-                    features_dict = dict(df_result)
-
-            return {"success": True, "features": features_dict, "error": None}
+            return {
+                "success": True,
+                "features": features,
+                "error": None,
+            }
 
         except Exception as e:
-            logger.error(
-                "Error during preprocessing",
-                exc_info=True,
-            )
-            return {"success": False, "features": None, "error": str(e)}
+            logger.error("Error during preprocessing", exc_info=True)
+            return {
+                "success": False,
+                "features": None,
+                "error": str(e),
+            }
 
     # -------------------------------------------------------------------------
     # Prediction
