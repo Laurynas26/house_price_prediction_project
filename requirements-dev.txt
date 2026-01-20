@@ -8,3 +8,4 @@ isort
 pre-commit
 numpy
 pandas
+xgboost
