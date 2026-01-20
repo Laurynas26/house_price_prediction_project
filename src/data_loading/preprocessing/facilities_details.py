@@ -52,11 +52,11 @@ def preprocess_outdoor_features(outdoor_dict):
     Clean and standardize the outdoor features dictionary.
 
     Args:
-        outdoor_dict (dict): e.g. {'Ligging': 'In woonwijk', 'Tuin': None, 
+        outdoor_dict (dict): e.g. {'Ligging': 'In woonwijk', 'Tuin': None,
         'Achtertuin': None, 'Ligging tuin': None}
 
     Returns:
-        dict: cleaned features with standardized keys and values 
+        dict: cleaned features with standardized keys and values
         or pd.NA for missing.
     """
     import pandas as pd

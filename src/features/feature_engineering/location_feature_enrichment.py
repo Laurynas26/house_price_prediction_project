@@ -7,7 +7,6 @@ from pathlib import Path
 import os
 import boto3
 
-
 # ------------------- Config -------------------
 CITY_CENTER = (52.3730, 4.8923)  # Dam Square, Amsterdam
 CACHE_FILE = "../data/df_with_lat_lon_encoded.csv"

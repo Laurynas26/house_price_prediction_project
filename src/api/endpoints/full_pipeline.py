@@ -5,7 +5,6 @@ Kept for reference only.
 Preprocessing + prediction now live in AWS Lambda.
 """
 
-
 from fastapi import APIRouter, HTTPException, Query
 from src.api.core.manager import PipelineManager
 
@@ -48,7 +47,7 @@ def full_pipeline(
         if not preprocess_result.get("success", False):
             return {
                 "success": False,
-                "error": f"Preprocess failed: " 
+                "error": f"Preprocess failed: "
                 f"{preprocess_result.get('error')}",
             }
 

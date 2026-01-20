@@ -1,7 +1,9 @@
 from sklearn.preprocessing import OrdinalEncoder
 
 
-def encode_energy_label(X, column: str = "energy_label", encoder=None, fit: bool = True):
+def encode_energy_label(
+    X, column: str = "energy_label", encoder=None, fit: bool = True
+):
     """
     Encode the `energy_label` column into an ordinal numeric scale.
 
@@ -35,8 +37,17 @@ def encode_energy_label(X, column: str = "energy_label", encoder=None, fit: bool
     X[column] = X[column].replace({0: "G", "N/A": "G"}).fillna("G")
 
     energy_order = [
-        "G", "F", "E", "D", "C", "B",
-        "A", "A+", "A++", "A+++", "A++++"
+        "G",
+        "F",
+        "E",
+        "D",
+        "C",
+        "B",
+        "A",
+        "A+",
+        "A++",
+        "A+++",
+        "A++++",
     ]
 
     if encoder is None:
@@ -82,7 +93,9 @@ def encode_energy_labels_train_test_val(X_train, X_test, X_val=None):
     X_train_encoded, encoder = encode_energy_label(X_train, fit=True)
     X_test_encoded, _ = encode_energy_label(X_test, encoder=encoder, fit=False)
     if X_val is not None:
-        X_val_encoded, _ = encode_energy_label(X_val, encoder=encoder, fit=False)
+        X_val_encoded, _ = encode_energy_label(
+            X_val, encoder=encoder, fit=False
+        )
     else:
         X_val_encoded = None
     return X_train_encoded, X_test_encoded, X_val_encoded, encoder

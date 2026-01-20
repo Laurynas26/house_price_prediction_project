@@ -16,7 +16,6 @@ from src.features.feature_engineering.feature_expansion import (
     feature_expansion,
 )
 
-
 # ------------------- Luxury Amenities -------------------
 LUXURY_AMENITIES = [
     "has_lift",

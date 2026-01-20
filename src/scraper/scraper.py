@@ -98,7 +98,6 @@ class FundaScraper:
 
             service = Service(CHROMEDRIVER_PATH)
 
-
         else:
             if self.headless:
                 options.add_argument("--headless=new")

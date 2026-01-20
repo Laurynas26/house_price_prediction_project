@@ -116,7 +116,7 @@ def feature_expansion(
     if use_amenities:
         if amenities_df is None or amenity_radius_map is None:
             raise ValueError(
-                "amenities_df and amenity_radius_map must be provided" \
+                "amenities_df and amenity_radius_map must be provided"
                 " when use_amenities=True"
             )
         df, amenity_meta_out = enrich_with_amenities(

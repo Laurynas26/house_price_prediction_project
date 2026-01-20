@@ -69,7 +69,7 @@ def prepare_data_from_config(
 
     if geo_cache_file is None:
         raise FileNotFoundError(
-            "Geo cache file not found! " \
+            "Geo cache file not found! "
             "Check your YAML config or provide geo_cache_file explicitly."
         )
 
