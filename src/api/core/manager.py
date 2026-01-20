@@ -74,7 +74,8 @@ class PipelineManager:
         Detect runtime environment and return environment-specific settings.
 
         Returns:
-            Dictionary containing runtime flags such as S3 usage and cache behavior.
+            Dictionary containing runtime flags
+            such as S3 usage and cache behavior.
         """
         running_on_lambda = "AWS_LAMBDA_FUNCTION_NAME" in os.environ
 
@@ -164,7 +165,8 @@ class PipelineManager:
 
     def _load_geo_metadata(self, config_dir: Path):
         """
-        Load geolocation and amenities metadata used during feature engineering.
+        Load geolocation and amenities metadata used
+        during feature engineering.
 
         Args:
             config_dir: Base configuration directory.
@@ -212,7 +214,8 @@ class PipelineManager:
         """
         if self._initialized:
             logger.info(
-                "PipelineManager already initialized; skipping re-initialization"
+                "PipelineManager already initialized; " \
+                "skipping re-initialization"
             )
             return self
 
@@ -458,7 +461,7 @@ class PipelineManager:
             features_df = features_df.drop(columns=non_numeric)
 
         return features_df
-    
+
     def _run_model_prediction(self, features_df: pd.DataFrame) -> float:
         """
         Run model prediction and undo log-transform if applicable.
@@ -474,7 +477,6 @@ class PipelineManager:
 
         # Undo log-transform
         return np.expm1(raw_pred)
-
 
     def predict(self, features: Dict[str, Any]) -> Dict[str, Any]:
         """
