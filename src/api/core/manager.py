@@ -49,61 +49,80 @@ class PipelineManager:
             cls._instance._initialized = False
         return cls._instance
 
-    # -------------------------------------------------------------------------
-    # Initialization
-    # -------------------------------------------------------------------------
-    def initialize(self, config_dir: str):
+    def _load_configs(self, config_dir: Path) -> tuple[dict, dict]:
         """
-        Initialize preprocessing pipeline and ML model for inference.
-        Safe to call multiple times (singleton).
+        Load preprocessing and model configuration files.
+
+        Args:
+            config_dir: Directory containing YAML configuration files.
+
+        Returns:
+            Tuple of (preprocessing_cfg, model_cfg) dictionaries.
         """
+        logger.info("Loading preprocessing and model configs")
 
-        if self._initialized:
-            logger.info(
-                "PipelineManager already initialized; "
-                "skipping re-initialization"
-            )
-            return self
-
-        config_dir = Path(config_dir)
-
-        # ------------------------------------------------------------------
-        # Load configs
-        # ------------------------------------------------------------------
         with open(config_dir / "preprocessing_config.yaml") as f:
             preprocessing_cfg = yaml.safe_load(f)
 
         with open(config_dir / "model_config.yaml") as f:
             model_cfg = yaml.safe_load(f)
 
-        # ------------------------------------------------------------------
-        # Detect environment
-        # ------------------------------------------------------------------
+        return preprocessing_cfg, model_cfg
+
+    def _detect_runtime(self) -> dict:
+        """
+        Detect runtime environment and return environment-specific settings.
+
+        Returns:
+            Dictionary containing runtime flags such as S3 usage and cache behavior.
+        """
         running_on_lambda = "AWS_LAMBDA_FUNCTION_NAME" in os.environ
 
         if running_on_lambda:
-            logger.info("Running on AWS Lambda")
-            use_s3 = True
-            raw_json_pattern = None
-            load_pipeline_cache = True
-            save_pipeline_cache = False
-        else:
-            logger.info("Running locally: cache-only inference mode")
-            use_s3 = False
-            raw_json_pattern = None
-            load_pipeline_cache = False
-            save_pipeline_cache = False
+            logger.info("Detected AWS Lambda environment")
+            return {
+                "use_s3": True,
+                "raw_json_pattern": None,
+                "load_pipeline_cache": True,
+                "save_pipeline_cache": False,
+            }
 
-        # ------------------------------------------------------------------
-        # Create preprocessing pipeline (NO execution here)
-        # ------------------------------------------------------------------
-        self.pipeline = PreprocessingPipeline(
+        logger.info("Detected local environment")
+        return {
+            "use_s3": False,
+            "raw_json_pattern": None,
+            "load_pipeline_cache": False,
+            "save_pipeline_cache": False,
+        }
+
+    def _build_preprocessing_pipeline(
+        self,
+        preprocessing_cfg: dict,
+        model_cfg: dict,
+        runtime_cfg: dict,
+        config_dir: Path,
+    ):
+        """
+        Construct the preprocessing pipeline for inference.
+
+        Args:
+            preprocessing_cfg: Preprocessing configuration dictionary.
+            model_cfg: Model configuration dictionary.
+            runtime_cfg: Runtime-specific settings (Lambda vs local).
+            config_dir: Base configuration directory.
+
+        Returns:
+            Initialized PreprocessingPipeline instance.
+        """
+        logger.info("Initializing preprocessing pipeline")
+
+        return PreprocessingPipeline(
             config_paths={
                 "preprocessing": preprocessing_cfg,
                 "model": model_cfg,
             },
-            raw_json_pattern=raw_json_pattern,
-            use_s3=use_s3,
+            raw_json_pattern=runtime_cfg["raw_json_pattern"],
+            use_s3=runtime_cfg["use_s3"],
             s3_bucket=S3_BUCKET,
             s3_prefix=S3_PREFIX,
             model_config_path=config_dir / "model_config.yaml",
@@ -111,24 +130,25 @@ class PipelineManager:
                 "model_name",
                 "xgboost_early_stopping_optuna_feature_eng_geoloc_exp",
             ),
-            load_cache=load_pipeline_cache,
-            save_cache=save_pipeline_cache,
+            load_cache=runtime_cfg["load_pipeline_cache"],
+            save_cache=runtime_cfg["save_pipeline_cache"],
         )
 
-        # ------------------------------------------------------------------
-        # Load inference_meta (UNHASHED, UN-SCOPED)
-        # ------------------------------------------------------------------
+    def _load_inference_metadata(self, config_dir: Path):
+        """
+        Load inference metadata required to align preprocessing
+        with training-time feature expectations.
 
-        logger.info("Loading inference metadata from disk")
+        Args:
+            config_dir: Base configuration directory.
+        """
+        logger.info("Loading inference metadata")
 
-        # inference_meta_path = Path("data/cache/inference_meta.pkl")
         inference_meta_path = config_dir / "inference_meta.pkl"
-
         if not inference_meta_path.exists():
             raise RuntimeError(
-                "inference_meta.pkl not found at\n "
-                "data/cache/inference_meta.pkl\n"
-                "Generate it once during training preprocessing."
+                "inference_meta.pkl not found. "
+                "Generate it during training preprocessing."
             )
 
         with open(inference_meta_path, "rb") as f:
@@ -138,26 +158,26 @@ class PipelineManager:
         self.pipeline.expected_columns = inference_meta["expected_columns"]
 
         logger.info(
-            "Loaded inference metadata (%d expected columns)",
+            "Inference metadata loaded (%d expected columns)",
             len(self.pipeline.expected_columns),
         )
 
-        # ------------------------------------------------------------------
-        # Load geo & amenities metadata (same as training)
-        # ------------------------------------------------------------------
+    def _load_geo_metadata(self, config_dir: Path):
+        """
+        Load geolocation and amenities metadata used during feature engineering.
+
+        Args:
+            config_dir: Base configuration directory.
+        """
+        logger.info("Loading geo and amenities metadata")
 
         geo_cache_file, amenities_df, amenity_radius_map = load_geo_config(
             config_dir / "model_config.yaml"
         )
 
-        # --- Resolve geo cache path relative to config_dir ---
         geo_cache_path = config_dir / geo_cache_file
-
         if not geo_cache_path.exists():
-            raise RuntimeError(
-                f"Geo cache file not found at {geo_cache_path}. "
-                "Ensure it is bundled in config/ for Lambda."
-            )
+            raise RuntimeError(f"Geo cache file not found: {geo_cache_path}")
 
         lat_lon_cache = load_cache(geo_cache_path)
 
@@ -173,16 +193,45 @@ class PipelineManager:
         )
 
         logger.info(
-            "Geo metadata loaded | amenities shape=%s | lat/lon cache size=%d",
+            "Geo loaded | amenities=%s | lat/lon cache size=%d",
             amenities_df.shape if amenities_df is not None else None,
             len(lat_lon_cache),
         )
 
-        # ------------------------------------------------------------------
-        # Load ML model from MLflow
-        # ------------------------------------------------------------------
-
+    def _load_model(self, model_cfg: dict):
+        logger.info("Loading ML model")
         self.model = load_production_model(model_cfg)
+
+    # -------------------------------------------------------------------------
+    # Initialization
+    # -------------------------------------------------------------------------
+    def initialize(self, config_dir: str):
+        """
+        Initialize preprocessing pipeline and ML model for inference.
+        Safe to call multiple times (singleton).
+        """
+        if self._initialized:
+            logger.info(
+                "PipelineManager already initialized; skipping re-initialization"
+            )
+            return self
+
+        config_dir = Path(config_dir)
+
+        preprocessing_cfg, model_cfg = self._load_configs(config_dir)
+        runtime_cfg = self._detect_runtime()
+
+        self.pipeline = self._build_preprocessing_pipeline(
+            preprocessing_cfg=preprocessing_cfg,
+            model_cfg=model_cfg,
+            runtime_cfg=runtime_cfg,
+            config_dir=config_dir,
+        )
+
+        self._load_inference_metadata(config_dir)
+        self._load_geo_metadata(config_dir)
+
+        self.model = self._load_model(model_cfg)
 
         self._initialized = True
         logger.info("Pipeline and model initialized successfully")
@@ -346,6 +395,7 @@ class PipelineManager:
             }
 
         except Exception as e:
+            logger.error("Prediction failed", exc_info=True)
             return {
                 "success": False,
                 "prediction": None,
