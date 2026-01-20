@@ -30,6 +30,10 @@ jobs:
 
       - name: Run tests
         run: |
-          export PYTHONPATH=$PWD/src
-          pytest tests/
+          PYTHONPATH=${{ github.workspace }} pytest tests/
 
+      - name: Check PYTHONPATH and files
+        run: |
+          echo $PWD
+          ls -l
+          echo $PYTHONPATH
