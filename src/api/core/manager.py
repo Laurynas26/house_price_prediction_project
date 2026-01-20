@@ -214,7 +214,7 @@ class PipelineManager:
         """
         if self._initialized:
             logger.info(
-                "PipelineManager already initialized; " \
+                "PipelineManager already initialized; "
                 "skipping re-initialization"
             )
             return self
@@ -408,6 +408,19 @@ class PipelineManager:
 
         raise ValueError("Cannot extract feature names from model.")
 
+    def _resolve_feature_schema(self) -> list[str]:
+        # Training-time schema (best)
+        if hasattr(self.pipeline, "expected_columns"):
+            return list(self.pipeline.expected_columns)
+
+        # Model metadata (fallback)
+        try:
+            return self._get_model_feature_names()
+        except Exception:
+            pass
+
+        raise RuntimeError("No feature schema available for prediction.")
+
     def _align_features_to_model(
         self,
         features_df: pd.DataFrame,
@@ -496,7 +509,7 @@ class PipelineManager:
         try:
             features_df = self._to_feature_dataframe(features)
 
-            model_features = self._get_model_feature_names()
+            model_features = self._resolve_feature_schema()
             features_df = self._align_features_to_model(
                 features_df, model_features
             )
