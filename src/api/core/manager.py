@@ -403,34 +403,27 @@ class PipelineManager:
 
         return list(self.pipeline.expected_columns)
 
-    def _align_features_to_model(
+    def _log_feature_mismatch(
         self,
         features_df: pd.DataFrame,
-        model_features: list[str],
-    ) -> pd.DataFrame:
+    ) -> None:
         """
-        Align input features to model's expected feature order.
-
         Logs missing and extra features.
 
         Args:
             features_df: Input feature DataFrame.
-            model_features: Feature names expected by the model.
 
-        Returns:
-            Aligned DataFrame.
         """
+        schema = self.pipeline.expected_columns
         input_features = features_df.columns.tolist()
 
-        missing = [f for f in model_features if f not in input_features]
-        extra = [f for f in input_features if f not in model_features]
+        missing = [f for f in schema if f not in input_features]
+        extra = [f for f in input_features if f not in schema]
 
         if missing:
             logger.warning("Missing features in input: %s", missing)
         if extra:
             logger.warning("Extra features in input: %s", extra)
-
-        return features_df.reindex(columns=model_features, fill_value=0)
 
     def _sanitize_numeric_features(
         self, features_df: pd.DataFrame
@@ -456,6 +449,23 @@ class PipelineManager:
             features_df = features_df.drop(columns=non_numeric)
 
         return features_df
+
+    def _enforce_model_schema(
+        self,
+        features_df: pd.DataFrame,
+    ) -> pd.DataFrame:
+        """
+        Enforce training-time feature schema and column order.
+        Drops any extra columns and fills missing ones with 0.
+
+        This MUST be the final transformation before prediction.
+        """
+        schema = self.pipeline.expected_columns
+
+        return features_df.reindex(
+            columns=schema,
+            fill_value=0,
+        )
 
     def _run_model_prediction(self, features_df: pd.DataFrame) -> float:
         """
@@ -491,11 +501,11 @@ class PipelineManager:
         try:
             features_df = self._to_feature_dataframe(features)
 
-            model_features = self._resolve_feature_schema()
-            features_df = self._align_features_to_model(
-                features_df, model_features
-            )
             features_df = self._sanitize_numeric_features(features_df)
+
+            self._log_feature_mismatch(features_df)
+
+            features_df = self._enforce_model_schema(features_df)
 
             prediction = self._run_model_prediction(features_df)
 
