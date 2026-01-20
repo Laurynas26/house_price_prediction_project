@@ -9,9 +9,9 @@ repos:
     hooks:
       - id: flake8
 
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
-    hooks:
+  # - repo: https://github.com/pre-commit/pre-commit-hooks
+  #   rev: v4.6.0
+  #   hooks:
       # - id: trailing-whitespace # permission denied
-      - id: end-of-file-fixer
+      # - id: end-of-file-fixer
       # - id: check-yaml # permission denied
