@@ -62,7 +62,9 @@ class FundaScraper:
         selectors_path = os.path.join(project_root, "config", "selectors.json")
 
         if not os.path.exists(selectors_path):
-            raise FileNotFoundError(f"Selectors file not found at: {selectors_path}")
+            raise FileNotFoundError(
+                f"Selectors file not found at: {selectors_path}"
+            )
 
         with open(selectors_path, "r", encoding="utf-8") as f:
             self.selectors = json.load(f)
@@ -160,7 +162,9 @@ class FundaScraper:
         """
         assert self.soup is not None, "Soup is not initialized."
         if exact_match:
-            dt = self.soup.find("dt", string=lambda s: s and s.strip() == label_text)
+            dt = self.soup.find(
+                "dt", string=lambda s: s and s.strip() == label_text
+            )
         else:
             dt = self.soup.find("dt", string=lambda s: s and label_text in s)
         if dt:
@@ -252,7 +256,9 @@ class FundaScraper:
                 nr_rooms = match.group(1)
         return nr_rooms
 
-    def parse_bathrooms_and_toilets(self, info_text: Optional[str]) -> Tuple[str, str]:
+    def parse_bathrooms_and_toilets(
+        self, info_text: Optional[str]
+    ) -> Tuple[str, str]:
         """
         Extract number of bathrooms and separate toilets from text.
 
@@ -317,7 +323,9 @@ class FundaScraper:
                             {
                                 "parcel": dt_text,
                                 "link": (
-                                    dd.find("a")["href"] if dd.find("a") else None
+                                    dd.find("a")["href"]
+                                    if dd.find("a")
+                                    else None
                                 ),
                             }
                         )
@@ -364,14 +372,20 @@ class FundaScraper:
                 basic = self.selectors["basic"]
                 self.results["price"] = self.extract_text(basic["price"])
                 self.results["address"] = self.extract_text(basic["address"])
-                self.results["postal_code"] = self.extract_text(basic["postal_code"])
-                self.results["neighborhood"] = self.extract_text(basic["neighborhood"])
+                self.results["postal_code"] = self.extract_text(
+                    basic["postal_code"]
+                )
+                self.results["neighborhood"] = self.extract_text(
+                    basic["neighborhood"]
+                )
                 self.results["status"] = self.extract_text(basic["status"])
             except Exception as e:
                 logging.warning(f"Error parsing basic info: {e}")
 
             try:
-                size, bedrooms, energy_label = self.parse_size_bedrooms_energy()
+                size, bedrooms, energy_label = (
+                    self.parse_size_bedrooms_energy()
+                )
                 self.results["size"] = size
                 self.results["bedrooms"] = bedrooms
                 self.results["energy_label"] = energy_label
@@ -379,7 +393,9 @@ class FundaScraper:
                 logging.warning(f"Error parsing size/bedrooms/energy: {e}")
 
             try:
-                self.results["neighborhood_details"] = self.parse_neighborhood_details()
+                self.results["neighborhood_details"] = (
+                    self.parse_neighborhood_details()
+                )
             except Exception as e:
                 logging.warning(f"Error parsing neighborhood details: {e}")
 
@@ -393,7 +409,9 @@ class FundaScraper:
                 ("balcony", self.extract_dd_by_dt_label),
                 (
                     "rooms_info",
-                    lambda x: self.parse_rooms_info(self.extract_dd_by_dt_label(x)),
+                    lambda x: self.parse_rooms_info(
+                        self.extract_dd_by_dt_label(x)
+                    ),
                 ),
                 (
                     "bathrooms_info",
@@ -407,7 +425,9 @@ class FundaScraper:
                 try:
                     value = parser(dl_labels[label_key])
                     if label_key == "bathrooms_info":
-                        self.results["bathrooms"], self.results["toilets"] = value
+                        self.results["bathrooms"], self.results["toilets"] = (
+                            value
+                        )
                     elif label_key == "rooms_info":
                         self.results["nr_rooms"] = value
                     else:
@@ -426,7 +446,9 @@ class FundaScraper:
                 logging.warning(f"Error parsing cadastral info: {e}")
 
             try:
-                self.results["outdoor_features"] = self.parse_outdoor_features()
+                self.results["outdoor_features"] = (
+                    self.parse_outdoor_features()
+                )
             except Exception as e:
                 logging.warning(f"Error parsing outdoor features: {e}")
 
@@ -440,7 +462,9 @@ class FundaScraper:
             }
 
         except Exception as e:
-            logging.error(f"Error during scraping {self.url}: {e}", exc_info=True)
+            logging.error(
+                f"Error during scraping {self.url}: {e}", exc_info=True
+            )
             return {
                 "success": False,
                 "url": self.url,
