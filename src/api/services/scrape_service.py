@@ -32,9 +32,7 @@ def scrape_and_store(url: str, headless: bool = True):
         return job_id, {"html": html_key, "json": json_key}, None
     else:
         # Local storage paths
-        html_path = os.path.join(
-            "data/api_scrapes/scraped_raw_html", f"{job_id}.html"
-        )
+        html_path = os.path.join("data/api_scrapes/scraped_raw_html", f"{job_id}.html")
         json_path = os.path.join(
             "data/api_scrapes/scraped_parsed_json", f"{job_id}.json"
         )

@@ -54,8 +54,7 @@ def drop_low_variance_dummies(df, threshold=0.95):
     low_var_cols = [
         col
         for col in df.columns
-        if df[col].value_counts(normalize=True, dropna=False).iloc[0]
-        >= threshold
+        if df[col].value_counts(normalize=True, dropna=False).iloc[0] >= threshold
     ]
     return df.drop(columns=low_var_cols), low_var_cols
 

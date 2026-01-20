@@ -108,8 +108,7 @@ class PreprocessingPipeline:
                 cache_key, cfg, scope = key_info
                 if self.cache.exists(cache_key, cfg, scope=scope):
                     print(
-                        f"[SMART CACHE] Skipping {step_name}, "
-                        f"loading cached result"
+                        f"[SMART CACHE] Skipping {step_name}, " f"loading cached result"
                     )
                     cached_data = self.cache.load(cache_key, cfg, scope=scope)
                     self._restore_from_cache(step_name, cached_data)
@@ -127,9 +126,7 @@ class PreprocessingPipeline:
                 "meta": self.meta,
                 "expected_columns": self.X_train.columns.tolist(),
             }
-            self.cache.save(
-                inference_meta, "inference_meta", config=None, scope=None
-            )
+            self.cache.save(inference_meta, "inference_meta", config=None, scope=None)
             print(
                 "[CACHE] Saved inference_meta for future single listing"
                 " preprocessing."
@@ -173,9 +170,7 @@ class PreprocessingPipeline:
         else:
             if self.use_s3:
                 # Cloud loading
-                self.df_raw = load_data_from_s3_json(
-                    self.s3_bucket, self.s3_prefix
-                )
+                self.df_raw = load_data_from_s3_json(self.s3_bucket, self.s3_prefix)
             else:
                 # Local loading
                 self.df_raw = load_data_from_json(self.raw_json_pattern)
@@ -225,9 +220,7 @@ class PreprocessingPipeline:
                 "feature_eng_result", self.config_paths, scope=self.model_name
             )
             self._restore_from_cache("feature_engineering", data)
-            print(
-                f"Loaded cached feature-engineered data: {self.X_train.shape}"
-            )
+            print(f"Loaded cached feature-engineered data: {self.X_train.shape}")
             return
 
         (
@@ -328,9 +321,7 @@ class PreprocessingPipeline:
                 df[log_col] = np.log1p(df[base_col].fillna(0).astype(float))
 
         # --- Ensure all training columns exist ---
-        missing_cols = [
-            c for c in self.expected_columns if c not in df.columns
-        ]
+        missing_cols = [c for c in self.expected_columns if c not in df.columns]
         for col in missing_cols:
             df[col] = 0 if col.startswith("has_") else pd.NA
 
@@ -361,14 +352,10 @@ def ensure_facility_columns(
     for col in key_facilities:
         if col not in df.columns:
             df[col] = 0
-    return df[
-        key_facilities + [c for c in df.columns if c not in key_facilities]
-    ]
+    return df[key_facilities + [c for c in df.columns if c not in key_facilities]]
 
 
-def ensure_all_categorical_columns(
-    df: pd.DataFrame, meta: dict
-) -> pd.DataFrame:
+def ensure_all_categorical_columns(df: pd.DataFrame, meta: dict) -> pd.DataFrame:
     """
     Ensures that all one-hot encoded categorical columns seen
     during training exist.

@@ -39,8 +39,8 @@ def unified_objective(
     """
 
     # 1️⃣ Load model config and suggest trial parameters
-    model_params, fit_params, search_space = (
-        load_model_config_and_search_space(model_config, model_name)
+    model_params, fit_params, search_space = load_model_config_and_search_space(
+        model_config, model_name
     )
     model_params, fit_params = suggest_params_from_space(
         trial, model_params, fit_params, search_space

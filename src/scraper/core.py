@@ -46,9 +46,7 @@ def scrape_listing(
         }
 
     try:
-        scraper = FundaScraper(
-            url, selectors_path=selectors_path, headless=headless
-        )
+        scraper = FundaScraper(url, selectors_path=selectors_path, headless=headless)
 
         # Run the scraper
         results = scraper.run()
@@ -78,8 +76,7 @@ def scrape_listing(
                         ContentType="application/json",
                     )
                     logging.info(
-                        "[INFO] Saved HTML and JSON to S3:"
-                        f"{html_key}, {json_key}"
+                        "[INFO] Saved HTML and JSON to S3:" f"{html_key}, {json_key}"
                     )
                 except Exception as e:
                     logging.warning(f"[WARN] Failed to save to S3: {e}")
@@ -94,9 +91,7 @@ def scrape_listing(
                         url,
                         output_dir=output_dir,
                     )
-                    logging.info(
-                        f"[INFO] Saved HTML and JSON locally at {output_dir}"
-                    )
+                    logging.info(f"[INFO] Saved HTML and JSON locally at {output_dir}")
                 except Exception as e:
                     logging.warning(f"[WARN] Failed saving locally: {e}")
 

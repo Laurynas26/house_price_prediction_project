@@ -22,9 +22,7 @@ def predict_price(preprocessed_listing: Dict[str, Any]):
     {"size_num": 86, "nr_rooms": 3, ...}
     """
     if not manager._initialized:
-        raise HTTPException(
-            status_code=500, detail="PipelineManager not initialized"
-        )
+        raise HTTPException(status_code=500, detail="PipelineManager not initialized")
     try:
         # Validate input
         if "features" in preprocessed_listing:

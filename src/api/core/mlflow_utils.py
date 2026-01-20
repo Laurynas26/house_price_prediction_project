@@ -87,9 +87,7 @@ def _load_from_local(experiment_name: str, model_name: str) -> any:
     client = MlflowClient()
     experiment = client.get_experiment_by_name(experiment_name)
     if experiment is None:
-        raise RuntimeError(
-            f"Experiment '{experiment_name}' not found in MLflow"
-        )
+        raise RuntimeError(f"Experiment '{experiment_name}' not found in MLflow")
 
     experiment_id = experiment.experiment_id
 
@@ -100,14 +98,10 @@ def _load_from_local(experiment_name: str, model_name: str) -> any:
     )
 
     valid_runs = [
-        r
-        for r in all_runs
-        if r.info.status == "FINISHED" and r.info.artifact_uri
+        r for r in all_runs if r.info.status == "FINISHED" and r.info.artifact_uri
     ]
     if not valid_runs:
-        raise RuntimeError(
-            f"No valid MLflow runs found for runName '{model_name}'"
-        )
+        raise RuntimeError(f"No valid MLflow runs found for runName '{model_name}'")
 
     latest_run = valid_runs[0]
     run_id = latest_run.info.run_id
@@ -146,9 +140,7 @@ def load_production_model(model_cfg: dict, experiment_name: str = None) -> any:
     """
     production_model_name = model_cfg.get("production_model_name")
     if not production_model_name:
-        raise RuntimeError(
-            "production_model_name missing in model_config.yaml"
-        )
+        raise RuntimeError("production_model_name missing in model_config.yaml")
 
     experiment = experiment_name or model_cfg.get(
         "experiment_name", "house_price_prediction"
@@ -159,8 +151,6 @@ def load_production_model(model_cfg: dict, experiment_name: str = None) -> any:
         experiment,
     )
 
-    model = load_latest_mlflow_model(
-        production_model_name, experiment_name=experiment
-    )
+    model = load_latest_mlflow_model(production_model_name, experiment_name=experiment)
     logger.info("✅ Production model loaded successfully")
     return model

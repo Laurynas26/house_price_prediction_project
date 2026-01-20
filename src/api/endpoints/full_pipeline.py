@@ -25,9 +25,7 @@ def full_pipeline(
     Returns a dict with success, features, and prediction.
     """
     if not manager._initialized:
-        raise HTTPException(
-            status_code=500, detail="PipelineManager not initialized"
-        )
+        raise HTTPException(status_code=500, detail="PipelineManager not initialized")
 
     try:
         # --- Scrape ---
@@ -47,8 +45,7 @@ def full_pipeline(
         if not preprocess_result.get("success", False):
             return {
                 "success": False,
-                "error": f"Preprocess failed: "
-                f"{preprocess_result.get('error')}",
+                "error": f"Preprocess failed: " f"{preprocess_result.get('error')}",
             }
 
         features = preprocess_result.get("features")
@@ -63,8 +60,7 @@ def full_pipeline(
         if not prediction_result.get("success", False):
             return {
                 "success": False,
-                "error": f"Prediction failed: "
-                f"{prediction_result.get('error')}",
+                "error": f"Prediction failed: " f"{prediction_result.get('error')}",
             }
 
         return {
