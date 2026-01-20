@@ -202,7 +202,7 @@ class PipelineManager:
 
     def _load_model(self, model_cfg: dict):
         logger.info("Loading ML model")
-        self.model = load_production_model(model_cfg)
+        return load_production_model(model_cfg)
 
     # -------------------------------------------------------------------------
     # Initialization
@@ -388,38 +388,20 @@ class PipelineManager:
 
         return pd.DataFrame(features)
 
-    def _get_model_feature_names(self) -> list[str]:
-        """
-        Extract feature names expected by the trained model.
-
-        Returns:
-            List of feature names.
-
-        Raises:
-            ValueError if feature names cannot be determined.
-        """
-        if hasattr(self.model, "feature_names"):
-            return list(self.model.feature_names)
-
-        if hasattr(self.model, "get_attr"):
-            feature_names = self.model.get_attr("feature_names")
-            if feature_names:
-                return list(feature_names)
-
-        raise ValueError("Cannot extract feature names from model.")
-
     def _resolve_feature_schema(self) -> list[str]:
-        # Training-time schema (best)
-        if hasattr(self.pipeline, "expected_columns"):
-            return list(self.pipeline.expected_columns)
+        """
+        Resolve the feature schema for prediction.
 
-        # Model metadata (fallback)
-        try:
-            return self._get_model_feature_names()
-        except Exception:
-            pass
+        Training-time schema (inference_meta.pkl) is the
+        single source of truth.
+        """
+        if not hasattr(self.pipeline, "expected_columns"):
+            raise RuntimeError(
+                "pipeline.expected_columns not loaded. "
+                "inference_meta.pkl is required for prediction."
+            )
 
-        raise RuntimeError("No feature schema available for prediction.")
+        return list(self.pipeline.expected_columns)
 
     def _align_features_to_model(
         self,
