@@ -27,6 +27,7 @@ jobs:
         run: flake8 src/ tests/
 
       - name: Run tests
+        shell: powershell
         run: |
-          set PYTHONPATH=%CD%\src
+          $env:PYTHONPATH = "$env:PYTHONPATH;src"
           pytest tests/
