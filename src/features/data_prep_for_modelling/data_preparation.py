@@ -24,7 +24,28 @@ SCALERS = {
 }
 
 
+"""
+High-level data preparation pipeline for model training and evaluation.
+
+This module orchestrates:
+- feature selection via YAML configs
+- train/validation/test splitting
+- optional feature engineering and expansion
+- encoding and scaling
+
+It delegates all domain-specific feature logic to
+`src.features.feature_engineering`.
+"""
+
+
 def load_geo_config(config_path: Path):
+    """
+    Load and validate geospatial feature configuration from a YAML file.
+
+    Resolves file paths for cached geolocation data and optional amenities
+    datasets required for distance- and proximity-based feature expansion.
+    """
+
     config_path = Path(config_path).resolve()
     if not config_path.exists():
         raise FileNotFoundError(f"Config file not found: {config_path}")
@@ -37,7 +58,9 @@ def load_geo_config(config_path: Path):
         raise ValueError("geo_cache_file not defined in YAML")
     geo_cache_file_path = (config_path.parent / geo_cache_file_name).resolve()
     if not geo_cache_file_path.exists():
-        raise FileNotFoundError(f"Geo cache file not found: {geo_cache_file_path}")
+        raise FileNotFoundError(
+            f"Geo cache file not found: {geo_cache_file_path}"
+        )
 
     amenities_file_name = geo_cfg.get("amenities_file")
     amenities_file_path = (
@@ -59,8 +82,15 @@ def load_geo_config(config_path: Path):
 def prepare_data_from_config(
     df, config_path, model_name, geo_cache_file=None, enable_cache_save=False
 ):
-    geo_cache_file_from_config, amenities_df, amenity_radius_map = load_geo_config(
-        config_path
+    """
+    Convenience wrapper around `prepare_data` that derives geospatial
+    configuration (cache paths, amenities, radii) directly from a YAML file.
+
+    Intended for training pipelines where feature behavior is fully
+    configuration-driven.
+    """
+    geo_cache_file_from_config, amenities_df, amenity_radius_map = (
+        load_geo_config(config_path)
     )
     if geo_cache_file is None:
         geo_cache_file = geo_cache_file_from_config
@@ -77,7 +107,9 @@ def prepare_data_from_config(
         model_name=model_name,
         use_extended_features=True,
         include_distance=True,
-        include_amenities=(amenities_df is not None and amenity_radius_map is not None),
+        include_amenities=(
+            amenities_df is not None and amenity_radius_map is not None
+        ),
         amenities_df=amenities_df,
         amenity_radius_map=amenity_radius_map,
         geo_cache_file=str(geo_cache_file),
@@ -86,6 +118,13 @@ def prepare_data_from_config(
 
 
 def load_features_config(config_path: str, model_name: str):
+    """
+    Load model-specific feature, target, splitting, and scaling configuration
+    from a YAML file.
+
+    Expects a top-level model key containing feature lists and training options.
+    """
+
     with open(config_path) as f:
         cfg = yaml.safe_load(f)
     model_cfg = cfg[model_name]
@@ -94,7 +133,9 @@ def load_features_config(config_path: str, model_name: str):
     split_cfg = model_cfg.get(
         "train_test_split", {"test_size": 0.2, "random_state": 42}
     )
-    scaling_cfg = model_cfg.get("scaling", {"method": "StandardScaler", "scale": True})
+    scaling_cfg = model_cfg.get(
+        "scaling", {"method": "StandardScaler", "scale": True}
+    )
     return features, target, split_cfg, scaling_cfg
 
 
@@ -167,11 +208,17 @@ def scale_data(X_train, X_test, X_val=None, scaler_cls=StandardScaler):
         scaler.transform(X_test), columns=X_test.columns, index=X_test.index
     )
     X_val_scaled = (
-        pd.DataFrame(scaler.transform(X_val), columns=X_val.columns, index=X_val.index)
+        pd.DataFrame(
+            scaler.transform(X_val), columns=X_val.columns, index=X_val.index
+        )
         if X_val is not None
         else None
     )
     return X_train_scaled, X_test_scaled, X_val_scaled, scaler
+
+
+# prepare_data() could be refactored/split in the future,
+# esp if the file grows
 
 
 def prepare_data(
@@ -187,10 +234,21 @@ def prepare_data(
     cv: bool = False,
     enable_cache_save: bool = False,
 ):
+    """
+    End-to-end data preparation for model training or evaluation.
+
+    Orchestrates feature selection, splitting, optional feature engineering
+    and expansion, encoding, and scaling based on a YAML configuration.
+
+    Returns train/test/(optional val) splits along with fitted scalers
+    and feature metadata for reuse during inference.
+    """
     features, target, split_cfg, scaling_cfg = load_features_config(
         config_path, model_name
     )
-    X, y = select_and_clean(df, features, target, extended_fe=use_extended_features)
+    X, y = select_and_clean(
+        df, features, target, extended_fe=use_extended_features
+    )
 
     val_required = split_cfg.get("val_required", False)
     val_size = split_cfg.get("val_size", 0.1)
@@ -257,7 +315,10 @@ def prepare_data(
 
         if not cv and X_test is not None:
             test_geo_cache_file = geo_cache_file
-            if test_geo_cache_file is None and meta.get("geo_cache_file") is not None:
+            if (
+                test_geo_cache_file is None
+                and meta.get("geo_cache_file") is not None
+            ):
                 test_geo_cache_file = meta["geo_cache_file"]
 
             X_test = prepare_features_test(
@@ -276,8 +337,8 @@ def prepare_data(
                 df_.drop(columns="address", inplace=True)
 
     if not cv and not use_extended_features:
-        X_train, X_test, X_val, energy_enc = encode_energy_labels_train_test_val(
-            X_train, X_test, X_val
+        X_train, X_test, X_val, energy_enc = (
+            encode_energy_labels_train_test_val(X_train, X_test, X_val)
         )
         fe_encoders["energy_label"] = energy_enc
 
@@ -289,12 +350,13 @@ def prepare_data(
             if df_ is not None and col in df_.columns:
                 df_[col] = df_[col].astype(float)
 
-    # Scaling
     if scaling_cfg.get("scale", True):
         scaler_cls = SCALERS.get(
             scaling_cfg.get("method", "StandardScaler"), StandardScaler
         )
-        X_train, X_test, X_val, scaler = scale_data(X_train, X_test, X_val, scaler_cls)
+        X_train, X_test, X_val, scaler = scale_data(
+            X_train, X_test, X_val, scaler_cls
+        )
     else:
         scaler = None
 
