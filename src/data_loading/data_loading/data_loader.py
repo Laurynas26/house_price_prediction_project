@@ -6,6 +6,46 @@ from typing import Union, List
 import boto3
 from io import BytesIO
 
+"""
+Utilities for loading raw property listing JSON data from
+local files or S3 and normalizing it into a schema-safe DataFrame.
+
+This module operates at the raw-data boundary and is intended
+for use before feature engineering or preprocessing.
+"""
+
+
+EXPECTED_SCHEMA = {
+    # Core numeric/parsed
+    "price": (None, (int, float, str, type(None))),
+    "contribution_vve": (None, (int, float, str, type(None))),
+    "size": (None, (int, float, str, type(None))),
+    "external_storage": (None, (int, float, str, type(None))),
+    "year_of_construction": (None, (int, float, str, type(None))),
+    "nr_rooms": (None, (int, float, str, type(None))),
+    "bathrooms": (None, (int, float, str, type(None))),
+    "toilets": (None, (int, float, str, type(None))),
+    "bedrooms": (None, (int, float, str, type(None))),
+    # Nested / complex
+    "facilities": ("", (str, list, type(None))),
+    "outdoor_features": ({}, (dict, type(None))),
+    "cadastral_parcels": ([], (list, type(None))),
+    "ownership_situations": ([], (list, type(None))),
+    "charges": ([], (list, type(None))),
+    "postal_code": (None, (str, type(None))),
+    "neighborhood_details": ({}, (dict, type(None))),
+    # Meta / optional
+    "address": (None, (str, type(None))),
+    "roof_type": (None, (str, type(None))),
+    "status": (None, (str, type(None))),
+    "ownership_type": (None, (str, type(None))),
+    "location": (None, (str, type(None))),
+    "energy_label": (None, (str, type(None))),
+    "located_on": (None, (str, type(None))),
+    "backyard": (None, (str, type(None))),
+    "balcony": (None, (str, type(None))),
+}
+
 
 # ----------------------------
 # S3 Utility Functions
@@ -18,7 +58,9 @@ def list_s3_files(bucket_name: str, prefix: str) -> List[str]:
     resp = s3.list_objects_v2(Bucket=bucket_name, Prefix=prefix)
     if "Contents" not in resp:
         return []
-    return [obj["Key"] for obj in resp["Contents"] if not obj["Key"].endswith("/")]
+    return [
+        obj["Key"] for obj in resp["Contents"] if not obj["Key"].endswith("/")
+    ]
 
 
 def load_json_from_s3(bucket_name: str, key: str) -> dict:
@@ -40,7 +82,6 @@ def load_data_from_s3_json(bucket_name: str, prefix: str) -> pd.DataFrame:
 
     data_list = [load_json_from_s3(bucket_name, key) for key in keys]
 
-    # Feed into your strict loader
     return pd.DataFrame(data_list)
 
 
@@ -115,37 +156,7 @@ def json_to_df_raw_strict(
         raise ValueError("Unsupported input type for json_to_df_raw_strict")
 
     # ------------------------- Expected schema -------------------------
-    expected_schema = {
-        # Core numeric/parsed
-        "price": (None, (int, float, str, type(None))),
-        "contribution_vve": (None, (int, float, str, type(None))),
-        "size": (None, (int, float, str, type(None))),
-        "external_storage": (None, (int, float, str, type(None))),
-        "year_of_construction": (None, (int, float, str, type(None))),
-        "nr_rooms": (None, (int, float, str, type(None))),
-        "bathrooms": (None, (int, float, str, type(None))),
-        "toilets": (None, (int, float, str, type(None))),
-        "bedrooms": (None, (int, float, str, type(None))),
-        # Nested / complex
-        "facilities": ("", (str, list, type(None))),
-        "outdoor_features": ({}, (dict, type(None))),
-        "cadastral_parcels": ([], (list, type(None))),
-        "ownership_situations": ([], (list, type(None))),
-        "charges": ([], (list, type(None))),
-        "postal_code": (None, (str, type(None))),
-        "neighborhood_details": ({}, (dict, type(None))),
-        # Meta / optional
-        "address": (None, (str, type(None))),
-        "roof_type": (None, (str, type(None))),
-        "status": (None, (str, type(None))),
-        "ownership_type": (None, (str, type(None))),
-        "location": (None, (str, type(None))),
-        "energy_label": (None, (str, type(None))),
-        "located_on": (None, (str, type(None))),
-        "backyard": (None, (str, type(None))),
-        "balcony": (None, (str, type(None))),
-    }
-
+    expected_schema = EXPECTED_SCHEMA
     rows = []
     for i, item in enumerate(data_list):
         row = {}
