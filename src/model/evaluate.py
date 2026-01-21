@@ -32,9 +32,7 @@ class ModelEvaluator:
             "mae": lambda y, y_pred: mean_absolute_error(y, y_pred),
             "r2": r2_score,
             "mape": lambda y, y_pred: np.mean(np.abs((y - y_pred) / y)) * 100,
-            "huber": lambda y, y_pred: huber_loss(
-                y, y_pred, delta=self.huber_delta
-            ),
+            "huber": lambda y, y_pred: huber_loss(y, y_pred, delta=self.huber_delta),
         }
         self.target_transform = target_transform
         self.inverse_transform = inverse_transform
@@ -76,14 +74,11 @@ class ModelEvaluator:
 
         # Apply target transformation
         y_train_trans = self._apply_transform(y_train)
-        y_val_trans = (
-            self._apply_transform(y_val) if y_val is not None else None
-        )
+        y_val_trans = self._apply_transform(y_val) if y_val is not None else None
         if use_xgb_train:
             if X_val is None or y_val is None:
                 raise ValueError(
-                    "Validation set must be provided for XGBoost early"
-                    " stopping."
+                    "Validation set must be provided for XGBoost early" " stopping."
                 )
             dtrain = xgb.DMatrix(X_train, label=y_train_trans)
             dval = xgb.DMatrix(X_val, label=y_val_trans)
@@ -114,9 +109,7 @@ class ModelEvaluator:
             trained_model.fit(X_train, y_train_trans, **combined_fit_params)
 
             y_train_pred = trained_model.predict(X_train)
-            y_val_pred = (
-                trained_model.predict(X_val) if X_val is not None else None
-            )
+            y_val_pred = trained_model.predict(X_val) if X_val is not None else None
             y_test_pred = trained_model.predict(X_test)
 
         # Inverse transform predictions

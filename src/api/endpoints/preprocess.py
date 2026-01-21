@@ -14,9 +14,7 @@ manager = PipelineManager()  # shared singleton-style instance
 
 
 @router.post("/")
-def preprocess_single_listing(
-    listing: Dict[str, Any], drop_target: bool = True
-):
+def preprocess_single_listing(listing: Dict[str, Any], drop_target: bool = True):
     """
     Preprocess a single listing using the fitted pipeline.
     Accepts either:
@@ -36,9 +34,7 @@ def preprocess_single_listing(
         print(f"Listing keys: {list(listing_to_process.keys())}")
 
         # --- Run pipeline preprocessing ---
-        result = manager.preprocess(
-            listing_to_process, drop_target=drop_target
-        )
+        result = manager.preprocess(listing_to_process, drop_target=drop_target)
 
         # --- Validation: manager-level error ---
         if not result.get("success", False):
@@ -57,6 +53,4 @@ def preprocess_single_listing(
         print(f"Type: {type(e)}")
         print(f"Message: {e}")
         traceback.print_exc(limit=8)
-        raise HTTPException(
-            status_code=500, detail=f"Preprocessing failed: {e}"
-        )
+        raise HTTPException(status_code=500, detail=f"Preprocessing failed: {e}")

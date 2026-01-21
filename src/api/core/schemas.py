@@ -1,6 +1,5 @@
 from typing import Dict, Tuple, Any
 
-
 # Expected input schema for a listing
 # Format:
 # field_name: (default_value, allowed_types)

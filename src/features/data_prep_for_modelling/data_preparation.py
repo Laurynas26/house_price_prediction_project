@@ -37,9 +37,7 @@ def load_geo_config(config_path: Path):
         raise ValueError("geo_cache_file not defined in YAML")
     geo_cache_file_path = (config_path.parent / geo_cache_file_name).resolve()
     if not geo_cache_file_path.exists():
-        raise FileNotFoundError(
-            f"Geo cache file not found: {geo_cache_file_path}"
-        )
+        raise FileNotFoundError(f"Geo cache file not found: {geo_cache_file_path}")
 
     amenities_file_name = geo_cfg.get("amenities_file")
     amenities_file_path = (
@@ -61,15 +59,15 @@ def load_geo_config(config_path: Path):
 def prepare_data_from_config(
     df, config_path, model_name, geo_cache_file=None, enable_cache_save=False
 ):
-    geo_cache_file_from_config, amenities_df, amenity_radius_map = (
-        load_geo_config(config_path)
+    geo_cache_file_from_config, amenities_df, amenity_radius_map = load_geo_config(
+        config_path
     )
     if geo_cache_file is None:
         geo_cache_file = geo_cache_file_from_config
 
     if geo_cache_file is None:
         raise FileNotFoundError(
-            "Geo cache file not found! " \
+            "Geo cache file not found! "
             "Check your YAML config or provide geo_cache_file explicitly."
         )
 
@@ -79,9 +77,7 @@ def prepare_data_from_config(
         model_name=model_name,
         use_extended_features=True,
         include_distance=True,
-        include_amenities=(
-            amenities_df is not None and amenity_radius_map is not None
-        ),
+        include_amenities=(amenities_df is not None and amenity_radius_map is not None),
         amenities_df=amenities_df,
         amenity_radius_map=amenity_radius_map,
         geo_cache_file=str(geo_cache_file),
@@ -98,9 +94,7 @@ def load_features_config(config_path: str, model_name: str):
     split_cfg = model_cfg.get(
         "train_test_split", {"test_size": 0.2, "random_state": 42}
     )
-    scaling_cfg = model_cfg.get(
-        "scaling", {"method": "StandardScaler", "scale": True}
-    )
+    scaling_cfg = model_cfg.get("scaling", {"method": "StandardScaler", "scale": True})
     return features, target, split_cfg, scaling_cfg
 
 
@@ -173,9 +167,7 @@ def scale_data(X_train, X_test, X_val=None, scaler_cls=StandardScaler):
         scaler.transform(X_test), columns=X_test.columns, index=X_test.index
     )
     X_val_scaled = (
-        pd.DataFrame(
-            scaler.transform(X_val), columns=X_val.columns, index=X_val.index
-        )
+        pd.DataFrame(scaler.transform(X_val), columns=X_val.columns, index=X_val.index)
         if X_val is not None
         else None
     )
@@ -198,9 +190,7 @@ def prepare_data(
     features, target, split_cfg, scaling_cfg = load_features_config(
         config_path, model_name
     )
-    X, y = select_and_clean(
-        df, features, target, extended_fe=use_extended_features
-    )
+    X, y = select_and_clean(df, features, target, extended_fe=use_extended_features)
 
     val_required = split_cfg.get("val_required", False)
     val_size = split_cfg.get("val_size", 0.1)
@@ -267,10 +257,7 @@ def prepare_data(
 
         if not cv and X_test is not None:
             test_geo_cache_file = geo_cache_file
-            if (
-                test_geo_cache_file is None
-                and meta.get("geo_cache_file") is not None
-            ):
+            if test_geo_cache_file is None and meta.get("geo_cache_file") is not None:
                 test_geo_cache_file = meta["geo_cache_file"]
 
             X_test = prepare_features_test(
@@ -289,8 +276,8 @@ def prepare_data(
                 df_.drop(columns="address", inplace=True)
 
     if not cv and not use_extended_features:
-        X_train, X_test, X_val, energy_enc = (
-            encode_energy_labels_train_test_val(X_train, X_test, X_val)
+        X_train, X_test, X_val, energy_enc = encode_energy_labels_train_test_val(
+            X_train, X_test, X_val
         )
         fe_encoders["energy_label"] = energy_enc
 
@@ -307,9 +294,7 @@ def prepare_data(
         scaler_cls = SCALERS.get(
             scaling_cfg.get("method", "StandardScaler"), StandardScaler
         )
-        X_train, X_test, X_val, scaler = scale_data(
-            X_train, X_test, X_val, scaler_cls
-        )
+        X_train, X_test, X_val, scaler = scale_data(X_train, X_test, X_val, scaler_cls)
     else:
         scaler = None
 

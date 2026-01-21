@@ -1,7 +1,9 @@
 from sklearn.preprocessing import OrdinalEncoder
 
 
-def encode_energy_label(X, column: str = "energy_label", encoder=None, fit: bool = True):
+def encode_energy_label(
+    X, column: str = "energy_label", encoder=None, fit: bool = True
+):
     """
     Encode the `energy_label` column into an ordinal numeric scale.
 
@@ -35,8 +37,17 @@ def encode_energy_label(X, column: str = "energy_label", encoder=None, fit: bool
     X[column] = X[column].replace({0: "G", "N/A": "G"}).fillna("G")
 
     energy_order = [
-        "G", "F", "E", "D", "C", "B",
-        "A", "A+", "A++", "A+++", "A++++"
+        "G",
+        "F",
+        "E",
+        "D",
+        "C",
+        "B",
+        "A",
+        "A+",
+        "A++",
+        "A+++",
+        "A++++",
     ]
 
     if encoder is None:

@@ -57,9 +57,7 @@ class CacheManager:
             return None
         if scope:
             if not isinstance(config, dict):
-                raise TypeError(
-                    f"Expected dict for config, got {type(config)}"
-                )
+                raise TypeError(f"Expected dict for config, got {type(config)}")
             return config.get(scope, config)
         return config
 
@@ -88,9 +86,7 @@ class CacheManager:
         if local_matches:
             return local_matches[-1]
         if self.is_lambda and self.prepackaged_cache_dir:
-            container_matches = sorted(
-                self.prepackaged_cache_dir.glob(pattern)
-            )
+            container_matches = sorted(self.prepackaged_cache_dir.glob(pattern))
             if container_matches:
                 return container_matches[-1]
         fallback = self.cache_dir / f"{name}_{hash_key}.pkl"

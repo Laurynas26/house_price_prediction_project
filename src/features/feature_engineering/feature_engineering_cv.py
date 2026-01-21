@@ -221,13 +221,9 @@ def prepare_fold_features(
     meta["encoder_energy"] = encoder_energy
 
     # ---------------- Categorical Features ----------------
-    X_train["postal_district"] = (
-        X_train["postal_code_clean"].astype(str).str[:3]
-    )
+    X_train["postal_district"] = X_train["postal_code_clean"].astype(str).str[:3]
     if X_val is not None:
-        X_val["postal_district"] = (
-            X_val["postal_code_clean"].astype(str).str[:3]
-        )
+        X_val["postal_district"] = X_val["postal_code_clean"].astype(str).str[:3]
 
     cat_cols = {
         "postal_district": X_train["postal_district"],
@@ -244,9 +240,7 @@ def prepare_fold_features(
         ohe_train_list.append(ohe)
         if X_val is not None:
             val_series = X_val[col_name]
-            val_ohe = pd.get_dummies(
-                val_series, prefix=col_name, drop_first=True
-            )
+            val_ohe = pd.get_dummies(val_series, prefix=col_name, drop_first=True)
             for c in ohe.columns:
                 if c not in val_ohe:
                     val_ohe[c] = 0
@@ -254,9 +248,7 @@ def prepare_fold_features(
             ohe_val_list.append(val_ohe)
 
     ohe_train_concat = pd.concat(ohe_train_list, axis=1)
-    ohe_train_reduced, dropped_cols = drop_low_variance_dummies(
-        ohe_train_concat
-    )
+    ohe_train_reduced, dropped_cols = drop_low_variance_dummies(ohe_train_concat)
     ohe_val_reduced = None
     if X_val is not None:
         ohe_val_reduced = pd.concat(ohe_val_list, axis=1).drop(
@@ -292,14 +284,10 @@ def prepare_fold_features(
         ]
     )
 
-    X_train_final = pd.concat(
-        [X_train[model_features], ohe_train_reduced], axis=1
-    )
+    X_train_final = pd.concat([X_train[model_features], ohe_train_reduced], axis=1)
     X_val_final = None
     if X_val is not None:
-        X_val_final = pd.concat(
-            [X_val[model_features], ohe_val_reduced], axis=1
-        )
+        X_val_final = pd.concat([X_val[model_features], ohe_val_reduced], axis=1)
 
     if include_distance:
         for df_, orig_df_ in [(X_train_final, X_train), (X_val_final, X_val)]:
@@ -350,9 +338,7 @@ def prepare_fold_features(
                 enable_cache_save=enable_cache_save,
             )
 
-        meta["expanded_features"] = list(
-            set(X_train_final.columns) - pre_exp_cols
-        )
+        meta["expanded_features"] = list(set(X_train_final.columns) - pre_exp_cols)
         meta["geo_meta"] = geo_meta_out
         meta["amenity_meta"] = amenity_meta_out
     else:

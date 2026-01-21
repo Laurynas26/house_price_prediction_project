@@ -1,5 +1,6 @@
 import yaml
 
+
 def load_search_space(config_path, model_name):
     """Load hyperparameter search space for a model from YAML."""
     with open(config_path) as f:

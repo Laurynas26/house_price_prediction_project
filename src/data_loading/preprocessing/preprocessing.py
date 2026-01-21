@@ -43,7 +43,7 @@ def preprocess_df(df, drop_raw: bool = False, numeric_cols: list = None):
         Raw dataframe (scraped or ingested) containing real estate listing
         data.
     drop_raw : bool, default=False
-        If True, drop original raw columns after preprocessing 
+        If True, drop original raw columns after preprocessing
         (e.g., `price`, `size`).
     numeric_cols : list of str, optional
         List of columns to coerce to numeric dtype using `coerce_numeric`.

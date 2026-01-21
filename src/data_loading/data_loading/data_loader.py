@@ -18,9 +18,7 @@ def list_s3_files(bucket_name: str, prefix: str) -> List[str]:
     resp = s3.list_objects_v2(Bucket=bucket_name, Prefix=prefix)
     if "Contents" not in resp:
         return []
-    return [
-        obj["Key"] for obj in resp["Contents"] if not obj["Key"].endswith("/")
-    ]
+    return [obj["Key"] for obj in resp["Contents"] if not obj["Key"].endswith("/")]
 
 
 def load_json_from_s3(bucket_name: str, key: str) -> dict:

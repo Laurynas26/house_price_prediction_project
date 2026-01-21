@@ -1,0 +1,17 @@
+{
+    // Use Black as the formatter
+    "python.formatting.provider": "black",
+    // Format on save
+    "editor.formatOnSave": true,
+    // Tell VS Code to use Black explicitly
+    "python.formatting.blackPath": "black",
+    // Respect pyproject.toml
+    "python.formatting.blackArgs": [],
+    // Make sure Python files use Python formatter
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter"
+    },
+    // Optional but recommended: trim whitespace
+    "files.trimTrailingWhitespace": true,
+    "files.insertFinalNewline": true
+}

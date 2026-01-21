@@ -36,9 +36,7 @@ def prepare_base_data(
     cols_to_keep = [c for c in features + extra_cols if c in df_copy.columns]
     missing_cols = [c for c in features if c not in df_copy.columns]
     if missing_cols:
-        raise KeyError(
-            f"The following required features are missing: {missing_cols}"
-        )
+        raise KeyError(f"The following required features are missing: {missing_cols}")
 
     X_full = df_copy[cols_to_keep].replace("N/A", np.nan).fillna(0)
     y_full = df_copy[target]
@@ -75,9 +73,7 @@ def prepare_fold_features(
         X_val,
         use_extended_features=use_extended_features,
         include_distance=True,
-        include_amenities=(
-            amenities_df is not None and amenity_radius_map is not None
-        ),
+        include_amenities=(amenities_df is not None and amenity_radius_map is not None),
         amenities_df=amenities_df,
         amenity_radius_map=amenity_radius_map,
         geo_cache_file=geo_cache_file,
@@ -90,4 +86,3 @@ def prepare_fold_features(
             df.drop(columns=["address"], inplace=True)
 
     return X_train_fe, X_val_fe, meta, fold_encoders
-

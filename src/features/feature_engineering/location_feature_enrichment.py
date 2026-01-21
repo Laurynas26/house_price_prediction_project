@@ -7,7 +7,6 @@ from pathlib import Path
 import os
 import boto3
 
-
 # ------------------- Config -------------------
 CITY_CENTER = (52.3730, 4.8923)  # Dam Square, Amsterdam
 CACHE_FILE = "../data/df_with_lat_lon_encoded.csv"
@@ -21,10 +20,7 @@ def haversine(lat1, lon1, lat2, lon2):
     phi1, phi2 = np.radians(lat1), np.radians(lat2)
     dphi = np.radians(lat2 - lat1)
     dlambda = np.radians(lon2 - lon1)
-    a = (
-        np.sin(dphi / 2) ** 2
-        + np.cos(phi1) * np.cos(phi2) * np.sin(dlambda / 2) ** 2
-    )
+    a = np.sin(dphi / 2) ** 2 + np.cos(phi1) * np.cos(phi2) * np.sin(dlambda / 2) ** 2
     return R * 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
 
 
@@ -145,12 +141,8 @@ def enrich_with_geolocation(
                 time.sleep(geopy_pause)
 
     # --- Attach cached lat/lon ---
-    df["lat"] = df["address"].map(
-        lambda a: lat_lon_cache.get(a, (None, None))[0]
-    )
-    df["lon"] = df["address"].map(
-        lambda a: lat_lon_cache.get(a, (None, None))[1]
-    )
+    df["lat"] = df["address"].map(lambda a: lat_lon_cache.get(a, (None, None))[0])
+    df["lon"] = df["address"].map(lambda a: lat_lon_cache.get(a, (None, None))[1])
 
     # --- Compute postal/neighborhood centroids ---
     if fit:
@@ -223,9 +215,7 @@ def enrich_with_geolocation(
 
     # --- Distance to city center ---
     df["dist_to_center_m"] = df.apply(
-        lambda r: haversine(
-            r["lat"], r["lon"], CITY_CENTER[0], CITY_CENTER[1]
-        ),
+        lambda r: haversine(r["lat"], r["lon"], CITY_CENTER[0], CITY_CENTER[1]),
         axis=1,
     )
 
@@ -260,8 +250,7 @@ def enrich_with_amenities(
             "bin_edges": [-1, 0, 2, 5, 10, np.inf],
             "bin_labels": ["0", "1-2", "3-5", "6-10", "10+"],
             "bin_mapping": {
-                label: i
-                for i, label in enumerate(["0", "1-2", "3-5", "6-10", "10+"])
+                label: i for i, label in enumerate(["0", "1-2", "3-5", "6-10", "10+"])
             },
         }
 
@@ -271,14 +260,10 @@ def enrich_with_amenities(
         subset = amenities_df[amenities_df["amenity_type"] == amenity]
         if subset.empty:
             continue
-        tree = BallTree(
-            np.radians(subset[["lat", "lon"]].values), metric="haversine"
-        )
+        tree = BallTree(np.radians(subset[["lat", "lon"]].values), metric="haversine")
         for r_km in radii:
             r_rad = r_km / earth_radius_km
-            counts = tree.query_radius(
-                listing_coords_rad, r=r_rad, count_only=True
-            )
+            counts = tree.query_radius(listing_coords_rad, r=r_rad, count_only=True)
             col_name = f"count_{amenity}_within_{int(r_km*1000)}m"
             # Wrap counts in pd.Series to allow map()
             df[col_name + "_bin_encoded"] = (
@@ -287,9 +272,7 @@ def enrich_with_amenities(
                     bins=amenity_meta["bin_edges"],
                     labels=amenity_meta["bin_labels"],
                 )
-                .map(
-                    amenity_meta["bin_mapping"], na_action=None
-                )  # explicit na_action
+                .map(amenity_meta["bin_mapping"], na_action=None)  # explicit na_action
                 .astype(int)
             )
 
@@ -312,11 +295,7 @@ def enrich_with_amenities(
                 df[col] = 0
         df = df.reindex(
             columns=list(df.columns)
-            + [
-                c
-                for c in amenity_meta["encoded_columns"]
-                if c not in df.columns
-            ]
+            + [c for c in amenity_meta["encoded_columns"] if c not in df.columns]
         )
 
     return df, amenity_meta
