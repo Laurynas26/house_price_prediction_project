@@ -12,6 +12,19 @@ import json
 import os
 
 
+"""
+Funda.nl listing scraper using Selenium + BeautifulSoup.
+
+Provides:
+- FundaScraper: Load pages, parse key listing info, return structured dict.
+- Parsing driven by CSS selectors in JSON config file.
+
+Typical usage:
+    scraper = FundaScraper(url)
+    results = scraper.run()
+"""
+
+
 class FundaScraper:
     """
     Scraper for Funda.nl real estate listings.
@@ -361,7 +374,13 @@ class FundaScraper:
         setup driver, fetch page, parse all info, and quit driver.
 
         Returns:
-            Dict[str, Any]: Dictionary with all scraped results.
+            dict: {
+                "success": bool,      # True if scraping succeeded
+                "url": str,           # URL scraped
+                "data": dict,         # All parsed fields
+                "error": str or None  # Error message if failed
+            }
+
         """
         try:
             logging.info(f"Starting scraper for URL: {self.url}")

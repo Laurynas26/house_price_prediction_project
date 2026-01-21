@@ -16,6 +16,19 @@ setup_logging()
 s3 = boto3.client("s3")
 BUCKET_NAME = os.getenv("S3_BUCKET")
 
+"""
+Core scraping functions for Funda listings.
+
+Provides:
+- scrape_listing: Scrape a single listing with error handling.
+- generate_job_id: Generate unique IDs for scrape jobs.
+- S3 or local saving of raw HTML and parsed JSON.
+
+Dependencies:
+- boto3 (optional for S3)
+- logging
+"""
+
 
 def generate_job_id() -> str:
     """Generate a unique ID for each scrape."""
@@ -31,6 +44,14 @@ def scrape_listing(
     Scrape a single Funda listing URL and return parsed results.
     Handles errors gracefully for API usage.
     Saves HTML and parsed JSON either locally or to S3 if BUCKET_NAME is set.
+
+    Returns:
+        dict: {
+            "success": bool,      # True if scrape succeeded
+            "url": str,           # The URL scraped
+            "data": dict or None, # Parsed data or None if failed
+            "error": str or None  # Error message if failed
+        }
     """
     logging.info(f"[DEBUG] Starting scrape for {url}")
 
@@ -46,9 +67,10 @@ def scrape_listing(
         }
 
     try:
-        scraper = FundaScraper(url, selectors_path=selectors_path, headless=headless)
+        scraper = FundaScraper(
+            url, selectors_path=selectors_path, headless=headless
+        )
 
-        # Run the scraper
         results = scraper.run()
 
         logging.info("[DEBUG] Scraper raw results:")
@@ -76,7 +98,8 @@ def scrape_listing(
                         ContentType="application/json",
                     )
                     logging.info(
-                        "[INFO] Saved HTML and JSON to S3:" f"{html_key}, {json_key}"
+                        "[INFO] Saved HTML and JSON to S3:"
+                        f"{html_key}, {json_key}"
                     )
                 except Exception as e:
                     logging.warning(f"[WARN] Failed to save to S3: {e}")
@@ -91,7 +114,9 @@ def scrape_listing(
                         url,
                         output_dir=output_dir,
                     )
-                    logging.info(f"[INFO] Saved HTML and JSON locally at {output_dir}")
+                    logging.info(
+                        f"[INFO] Saved HTML and JSON locally at {output_dir}"
+                    )
                 except Exception as e:
                     logging.warning(f"[WARN] Failed saving locally: {e}")
 
