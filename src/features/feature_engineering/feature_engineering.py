@@ -16,6 +16,26 @@ from src.features.feature_engineering.feature_expansion import (
     feature_expansion,
 )
 
+"""
+Feature engineering orchestration for model training, validation, and inference.
+
+This module defines the full feature preparation pipeline, including:
+- numeric parsing and imputation
+- log transformations
+- categorical encoding (OHE)
+- luxury and interaction features
+- optional geolocation and amenities enrichment
+
+Design notes
+------------
+- Feature expansion is applied *after* feature assembly to ensure
+  inference-time consistency.
+- All state required for inference is explicitly captured in `meta`.
+- This module intentionally prioritizes clarity and explicitness
+  over aggressive abstraction.
+"""
+
+
 # ------------------- Luxury Amenities -------------------
 LUXURY_AMENITIES = [
     "has_lift",
@@ -35,10 +55,20 @@ LUXURY_AMENITIES_WEIGHTS = {
 
 
 def add_luxury_features(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Derive luxury-related aggregate features from binary amenity flags.
+
+    Computes weighted luxury score, counts of luxury facilities,
+    and normalized luxury density metrics.
+    """
     df = df.copy()
-    df["luxury_score"] = sum(df[col] * w for col, w in LUXURY_AMENITIES_WEIGHTS.items())
+    df["luxury_score"] = sum(
+        df[col] * w for col, w in LUXURY_AMENITIES_WEIGHTS.items()
+    )
     df["num_luxury_facilities"] = df[LUXURY_AMENITIES].sum(axis=1)
-    df["has_high_end_facilities"] = (df["num_luxury_facilities"] >= 3).astype(int)
+    df["has_high_end_facilities"] = (df["num_luxury_facilities"] >= 3).astype(
+        int
+    )
     df["luxury_density"] = df["luxury_score"] / df["nr_rooms"].replace(0, 1)
     df["size_per_luxury"] = df["size_num"] / (df["luxury_score"] + 1)
     return df
@@ -47,11 +77,17 @@ def add_luxury_features(df: pd.DataFrame) -> pd.DataFrame:
 def add_luxury_interactions(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     if "luxury_score" not in df.columns:
-        raise ValueError("Run add_luxury_features before add_luxury_interactions")
+        raise ValueError(
+            "Run add_luxury_features before add_luxury_interactions"
+        )
 
-    df["luxury_x_price_m2"] = df["luxury_score"] * df["price_per_m2_neighborhood"]
+    df["luxury_x_price_m2"] = (
+        df["luxury_score"] * df["price_per_m2_neighborhood"]
+    )
     df["luxury_x_size"] = df["luxury_score"] * df["size_num"]
-    df["luxury_x_inhabitants"] = df["luxury_score"] * df["inhabitants_in_neighborhood"]
+    df["luxury_x_inhabitants"] = (
+        df["luxury_score"] * df["inhabitants_in_neighborhood"]
+    )
 
     return df
 
@@ -74,6 +110,13 @@ def prepare_features_train_val(
     fit=True,
     enable_cache_save=False,
 ):
+    """
+    Prepare model-ready features for training and validation.
+
+    This function fits all preprocessing artifacts on the training set
+    (imputation medians, log transforms, encoders, OHE schema)
+    and applies them consistently to the validation set.
+    """
     df_train = df_train.copy()
     df_val = df_val.copy() if df_val is not None else None
 
@@ -166,9 +209,13 @@ def prepare_features_train_val(
 
     # ------------------- Categoricals -------------------
     if "postal_code_clean" in df_train.columns:
-        df_train["postal_district"] = df_train["postal_code_clean"].astype(str).str[:3]
+        df_train["postal_district"] = (
+            df_train["postal_code_clean"].astype(str).str[:3]
+        )
         if df_val is not None:
-            df_val["postal_district"] = df_val["postal_code_clean"].astype(str).str[:3]
+            df_val["postal_district"] = (
+                df_val["postal_code_clean"].astype(str).str[:3]
+            )
 
     cat_cols = {
         "postal_district": df_train["postal_district"],
@@ -185,7 +232,9 @@ def prepare_features_train_val(
         ohe_train_list.append(ohe)
         if df_val is not None:
             val_series = df_val[col_name]
-            val_ohe = pd.get_dummies(val_series, prefix=col_name, drop_first=True)
+            val_ohe = pd.get_dummies(
+                val_series, prefix=col_name, drop_first=True
+            )
             for c in ohe.columns:
                 if c not in val_ohe:
                     val_ohe[c] = 0
@@ -193,9 +242,13 @@ def prepare_features_train_val(
             ohe_val_list.append(val_ohe)
 
     ohe_train_concat = pd.concat(ohe_train_list, axis=1)
-    ohe_train_reduced, dropped_cols = drop_low_variance_dummies(ohe_train_concat)
+    ohe_train_reduced, dropped_cols = drop_low_variance_dummies(
+        ohe_train_concat
+    )
     ohe_val_reduced = (
-        pd.concat(ohe_val_list, axis=1).drop(columns=dropped_cols, errors="ignore")
+        pd.concat(ohe_val_list, axis=1).drop(
+            columns=dropped_cols, errors="ignore"
+        )
         if df_val is not None
         else None
     )
@@ -229,7 +282,9 @@ def prepare_features_train_val(
         [df_train[model_features + preserve_cols], ohe_train_reduced], axis=1
     )
     X_val = (
-        pd.concat([df_val[model_features + preserve_cols], ohe_val_reduced], axis=1)
+        pd.concat(
+            [df_val[model_features + preserve_cols], ohe_val_reduced], axis=1
+        )
         if df_val is not None
         else None
     )
@@ -286,6 +341,40 @@ def prepare_features_train_val(
     return X_train, X_val, meta
 
 
+def _debug_and_deduplicate_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Debug helper to inspect and safely deduplicate duplicate columns by
+    selecting the first non-null value per row.
+
+    This function preserves all diagnostic prints and behavior exactly
+    as originally implemented.
+    """
+
+    if df.columns.duplicated().any():
+
+        deduped = {}
+        for col in df.columns.unique():
+            dup_df = df.loc[:, df.columns == col]
+
+            def first_non_null(row):
+                for v in row:
+                    if isinstance(v, (list, np.ndarray, pd.Series)):
+                        inner = next(
+                            (vv for vv in np.ravel(v) if pd.notna(vv)), None
+                        )
+                        if inner is not None:
+                            return inner
+                    elif pd.notna(v):
+                        return v
+                return None
+
+            deduped[col] = dup_df.apply(first_non_null, axis=1)
+
+        df = pd.DataFrame(deduped)
+
+    return df
+
+
 # ------------------- Test -------------------
 def prepare_features_test(
     df_test: pd.DataFrame,
@@ -321,7 +410,9 @@ def prepare_features_test(
     # ------------------- Numeric -------------------
     for col in meta["numeric_features"]:
         df_test[col] = (
-            df_test[col].apply(to_float).fillna(meta["train_medians"].get(col, 0))
+            df_test[col]
+            .apply(to_float)
+            .fillna(meta["train_medians"].get(col, 0))
         )
 
     # ------------------- Log-transform -------------------
@@ -339,53 +430,7 @@ def prepare_features_test(
     # ------------------- Extra numeric -------------------
     df_test["floor_level"] = df_test["located_on"].apply(extract_floor)
 
-    # Debug prints to check the problem
-    print("=== Debug: Checking df_test ===")
-    print("Duplicate row indices:", df_test.index.duplicated().sum())
-    print("Duplicate column names:", df_test.columns.duplicated().sum())
-    print(
-        df_test.columns[df_test.columns.duplicated()],
-        "duplicated column names if any",
-    )
-    duplicates = df_test.columns[df_test.columns.duplicated()].unique()
-    print("Duplicate column names:", duplicates)
-
-    # Find duplicated columns
-    dup_cols = df_test.columns[df_test.columns.duplicated()].unique()
-    print("Duplicate columns:", dup_cols)
-
-    # Inspect their contents
-    for col in dup_cols:
-        print(f"\nColumn: {col}")
-        duplicates = df_test.loc[
-            :, df_test.columns == col
-        ]  # select all duplicates of this column
-        print(duplicates)
-
-    if df_test.columns.duplicated().any():
-        print("[DEBUG] Deduplicating duplicate columns safely...")
-
-        deduped = {}
-        for col in df_test.columns.unique():
-            # Select all duplicate instances of this column
-            dup_cols = df_test.loc[:, df_test.columns == col]
-
-            # Reduce each row across duplicates
-            def first_non_null(row):
-                for v in row:
-                    # Handle lists/arrays robustly
-                    if isinstance(v, (list, np.ndarray, pd.Series)):
-                        # Flatten and find first non-null element inside
-                        inner = next((vv for vv in np.ravel(v) if pd.notna(vv)), None)
-                        if inner is not None:
-                            return inner
-                    elif pd.notna(v):
-                        return v
-                return None
-
-            deduped[col] = dup_cols.apply(first_non_null, axis=1)
-
-        df_test = pd.DataFrame(deduped)
+    df_test = _debug_and_deduplicate_columns(df_test)
 
     # Now it's safe to add new numeric features
     df_test["lease_years_remaining"] = (

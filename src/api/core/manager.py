@@ -300,7 +300,7 @@ class PipelineManager:
         Raises:
             ValueError if preprocessing produces no output.
         """
-        df_result = self.pipeline.preprocess_single(
+        df_result = self.pipeline.transform_single_for_inference(
             listing, drop_target=drop_target
         )
 

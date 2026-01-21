@@ -25,6 +25,9 @@ def feature_expansion(
     Expand features with row-wise, neighborhood, building, outdoor,
     and optional geo/amenities metrics.
 
+    This function is stateless and supports both training (fit=True)
+    and inference (fit=False) via explicit metadata passing.
+
     Parameters
     ----------
     df : pd.DataFrame
@@ -62,18 +65,18 @@ def feature_expansion(
     df["room_utilization_ratio"] = (
         df.get("size_num", 0) + df.get("bathrooms", 0) + df.get("toilets", 0)
     ) / df.get("nr_rooms", 1).replace(0, np.nan)
-    df["floor_to_size"] = df.get("floor_level", 0) / df.get("size_num", 1).replace(
-        0, np.nan
-    )
+    df["floor_to_size"] = df.get("floor_level", 0) / df.get(
+        "size_num", 1
+    ).replace(0, np.nan)
     df["external_storage_ratio"] = df.get("external_storage_num", 0) / df.get(
         "size_num", 1
     ).replace(0, np.nan)
 
     # ------------------- Neighborhood Features -------------------
     if "inhabitants_in_neighborhood" in df.columns:
-        df["inhabitants_per_room"] = df["inhabitants_in_neighborhood"] / df.get(
-            "nr_rooms", 1
-        ).replace(0, np.nan)
+        df["inhabitants_per_room"] = df[
+            "inhabitants_in_neighborhood"
+        ] / df.get("nr_rooms", 1).replace(0, np.nan)
         df["neighborhood_facility_density"] = df.get("num_facilities", 0) / df[
             "inhabitants_in_neighborhood"
         ].replace(0, np.nan)
@@ -82,11 +85,13 @@ def feature_expansion(
         df["neighborhood_facility_density"] = 0
 
     # ------------------- Building Age / Lease -------------------
-    df["building_age"] = current_year - df.get("year_of_construction", current_year)
-    df["old_house_flag"] = (df["building_age"] > 100).astype(int)
-    df["lease_ratio"] = df.get("lease_years_remaining", 0) / df["building_age"].replace(
-        0, np.nan
+    df["building_age"] = current_year - df.get(
+        "year_of_construction", current_year
     )
+    df["old_house_flag"] = (df["building_age"] > 100).astype(int)
+    df["lease_ratio"] = df.get("lease_years_remaining", 0) / df[
+        "building_age"
+    ].replace(0, np.nan)
 
     # ------------------- Balcony / Backyard -------------------
     df["has_outdoor_space"] = (
