@@ -36,10 +36,16 @@ def initialize_pipeline():
         return
 
     manager.initialize(config_dir=str(CONFIG_DIR))
+    # NOTE:
+    # Lambda overrides geo metadata here to avoid loading large files
+    # during cold start. This is intentionally Lambda-specific.
+
     manager.pipeline.meta["amenities_df"] = pd.read_csv(
         CONFIG_DIR / geo_cfg.get("amenities_file")
     )
-    manager.pipeline.meta["amenity_radius_map"] = geo_cfg.get("amenity_radius_map")
+    manager.pipeline.meta["amenity_radius_map"] = geo_cfg.get(
+        "amenity_radius_map"
+    )
     manager.pipeline.meta["geo_cache_file"] = str(
         CONFIG_DIR / geo_cfg.get("geo_cache_file")
     )
@@ -85,7 +91,9 @@ def lambda_handler(event, context):
         else:
             return {
                 "statusCode": 400,
-                "body": json.dumps({"error": "Provide either 'url' or 'manual_input'"}),
+                "body": json.dumps(
+                    {"error": "Provide either 'url' or 'manual_input'"}
+                ),
             }
 
     except Exception as e:

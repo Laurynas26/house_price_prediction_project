@@ -1,3 +1,10 @@
+"""
+DEPRECATED — DO NOT USE IN EC2 SERVICE
+
+Kept for reference only.
+Preprocessing + prediction now live in AWS Lambda.
+"""
+
 from fastapi import FastAPI
 from src.api.endpoints import scrape
 
