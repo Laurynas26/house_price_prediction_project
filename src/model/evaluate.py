@@ -11,28 +11,32 @@ import xgboost as xgb
 class ModelEvaluator:
     def __init__(
         self,
-        metrics=None,
+        metrics: dict[str, callable] | None,
         target_transform=None,
         inverse_transform=None,
         huber_delta=1.0,
     ):
         """
-        Evaluate models with optional target transformation and early stopping.
+        Unified model training and evaluation utility supporting:
+        - sklearn-style estimators
+        - raw XGBoost training with early stopping
+        - optional target transformation (e.g. log-scale training)
 
-        Args:
-            metrics: dict of metric_name -> function(y_true, y_pred)
-            target_transform: function applied to y before fitting
-            (e.g., np.log1p)
-            inverse_transform: function applied to predictions
-            to revert transform (e.g., np.expm1)
+        Computes consistent train / validation / test metrics and
+        returns both predictions and trained model artifacts.
         """
         self.huber_delta = huber_delta
         self.metrics = metrics or {
             "rmse": lambda y, y_pred: np.sqrt(mean_squared_error(y, y_pred)),
             "mae": lambda y, y_pred: mean_absolute_error(y, y_pred),
             "r2": r2_score,
-            "mape": lambda y, y_pred: np.mean(np.abs((y - y_pred) / y)) * 100,
-            "huber": lambda y, y_pred: huber_loss(y, y_pred, delta=self.huber_delta),
+            "mape": lambda y, y_pred: np.mean(
+                np.abs((y - y_pred) / np.maximum(np.abs(y), 1e-8))
+            )
+            * 100,
+            "huber": lambda y, y_pred: huber_loss(
+                y, y_pred, delta=self.huber_delta
+            ),
         }
         self.target_transform = target_transform
         self.inverse_transform = inverse_transform
@@ -59,26 +63,34 @@ class ModelEvaluator:
         use_xgb_train=False,
     ):
         """
-        Evaluate a model with training and validation sets.
+        Train (optionally) and evaluate a model using train/val/test splits.
 
-        Args:
-            model: sklearn model instance or XGBoost Booster
-            X_train, y_train: training data
-            X_val, y_val: validation data (required for XGBoost early stopping)
-            X_test, y_test: test data (metrics only)
-            model_params: fixed model parameters from YAML
-            fit_params: fit parameters from YAML (or overrides)
-            use_xgb_train: if True, use xgboost.train with early stopping
+        Supports:
+        - sklearn estimators via `.fit()` / `.predict()`
+        - XGBoost via `xgb.train()` with early stopping
+
+        Target transformations are applied consistently during training
+        and inverted for metric computation.
+
+        Returns:
+            trained_model
+            y_train_pred
+            y_val_pred
+            y_test_pred
+            results (dict of metric_name -> value)
         """
         self.results = {}
 
         # Apply target transformation
         y_train_trans = self._apply_transform(y_train)
-        y_val_trans = self._apply_transform(y_val) if y_val is not None else None
+        y_val_trans = (
+            self._apply_transform(y_val) if y_val is not None else None
+        )
         if use_xgb_train:
             if X_val is None or y_val is None:
                 raise ValueError(
-                    "Validation set must be provided for XGBoost early" " stopping."
+                    "Validation set must be provided for XGBoost early"
+                    " stopping."
                 )
             dtrain = xgb.DMatrix(X_train, label=y_train_trans)
             dval = xgb.DMatrix(X_val, label=y_val_trans)
@@ -109,7 +121,9 @@ class ModelEvaluator:
             trained_model.fit(X_train, y_train_trans, **combined_fit_params)
 
             y_train_pred = trained_model.predict(X_train)
-            y_val_pred = trained_model.predict(X_val) if X_val is not None else None
+            y_val_pred = (
+                trained_model.predict(X_val) if X_val is not None else None
+            )
             y_test_pred = trained_model.predict(X_test)
 
         # Inverse transform predictions

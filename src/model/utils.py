@@ -4,14 +4,26 @@ import numpy as np
 
 def load_model_config_and_search_space(config_path, model_name):
     """
-    Load model params, fit params, and optional Optuna search space
-    from a unified YAML.
+    Load model parameters, fit parameters, and Optuna search space
+    from a YAML configuration file.
 
-    Returns:
-        model_params: dict of fixed model parameters
-        fit_params: dict of fixed fit parameters
-        search_space: dict for Optuna hyperparameter tuning
+    Parameters
+    ----------
+    config_path : str
+        Path to the YAML file.
+    model_name : str
+        Key corresponding to the desired model in YAML.
+
+    Returns
+    -------
+    model_params : dict
+        Fixed model hyperparameters.
+    fit_params : dict
+        Fixed fit parameters (e.g., early stopping, num rounds).
+    search_space : dict
+        Optuna search space dictionary.
     """
+
     with open(config_path) as f:
         cfg = yaml.safe_load(f)
 
@@ -53,7 +65,9 @@ def suggest_params_from_space(trial, model_params, fit_params, search_space):
     return model_params, fit_params
 
 
-def huber_loss(y_true, y_pred, delta=1.0):
+def huber_loss(
+    y_true: np.ndarray, y_pred: np.ndarray, delta: float = 1.0
+) -> float:
     """
     Huber loss metric.
 
