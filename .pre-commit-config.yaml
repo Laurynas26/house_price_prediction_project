@@ -3,6 +3,7 @@ repos:
     rev: 24.4.2
     hooks:
       - id: black
+        stages: [manual]
 
   - repo: https://github.com/PyCQA/flake8
     rev: 7.0.0

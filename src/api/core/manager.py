@@ -214,7 +214,8 @@ class PipelineManager:
         """
         if self._initialized:
             logger.info(
-                "PipelineManager already initialized; " "skipping re-initialization"
+                "PipelineManager already initialized; "
+                "skipping re-initialization"
             )
             return self
 
@@ -286,7 +287,9 @@ class PipelineManager:
         Raises:
             ValueError if preprocessing produces no output.
         """
-        df_result = self.pipeline.preprocess_single(listing, drop_target=drop_target)
+        df_result = self.pipeline.preprocess_single(
+            listing, drop_target=drop_target
+        )
 
         if isinstance(df_result, pd.DataFrame):
             if df_result.empty:
@@ -303,7 +306,9 @@ class PipelineManager:
         logger.debug("Incoming listing keys: %s", list(listing.keys()))
 
         if "data" in listing and isinstance(listing["data"], dict):
-            logger.debug("Subkeys under 'data': %s", list(listing["data"].keys()))
+            logger.debug(
+                "Subkeys under 'data': %s", list(listing["data"].keys())
+            )
 
     def _normalize_preprocess_input(
         self,
@@ -316,7 +321,9 @@ class PipelineManager:
             Feature dictionary if already preprocessed, else None.
         """
         if "features" in listing:
-            logger.info("Listing already contains features; skipping preprocessing")
+            logger.info(
+                "Listing already contains features; skipping preprocessing"
+            )
             return listing["features"]
 
         return None
@@ -401,12 +408,25 @@ class PipelineManager:
         features_df: pd.DataFrame,
     ) -> None:
         """
-        Logs missing and extra features.
+        Logs missing and extra features compared to training-time schema.
+        Best-effort only — must never break prediction.
 
         Args:
             features_df: Input feature DataFrame.
 
         """
+        if not hasattr(self, "pipeline"):
+            logger.debug(
+                "Pipeline not available; skipping feature mismatch logging"
+            )
+            return
+
+        if not hasattr(self.pipeline, "expected_columns"):
+            logger.debug(
+                "Pipeline schema not available; skipping feature mismatch logging"
+            )
+            return
+
         schema = self.pipeline.expected_columns
         input_features = features_df.columns.tolist()
 
@@ -418,7 +438,9 @@ class PipelineManager:
         if extra:
             logger.warning("Extra features in input: %s", extra)
 
-    def _sanitize_numeric_features(self, features_df: pd.DataFrame) -> pd.DataFrame:
+    def _sanitize_numeric_features(
+        self, features_df: pd.DataFrame
+    ) -> pd.DataFrame:
         """
         Drop non-numeric columns before prediction.
 
@@ -428,7 +450,9 @@ class PipelineManager:
         Returns:
             Numeric-only DataFrame.
         """
-        non_numeric = features_df.select_dtypes(exclude=["number", "bool"]).columns
+        non_numeric = features_df.select_dtypes(
+            exclude=["number", "bool"]
+        ).columns
 
         if len(non_numeric) > 0:
             logger.info(
@@ -498,7 +522,10 @@ class PipelineManager:
 
             features_df = self._sanitize_numeric_features(features_df)
 
-            self._log_feature_mismatch(features_df)
+            try:
+                self._log_feature_mismatch(features_df)
+            except Exception:
+                logger.debug("Feature mismatch logging failed", exc_info=True)
 
             features_df = self._enforce_model_schema(features_df)
 
