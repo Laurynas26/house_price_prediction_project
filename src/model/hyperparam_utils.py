@@ -2,7 +2,24 @@ import yaml
 
 
 def load_search_space(config_path, model_name):
-    """Load hyperparameter search space for a model from YAML."""
+    """
+    Load hyperparameter search space for a model from YAML.
+
+    Parameters
+    ----------
+    config_path : str
+        Path to YAML file containing model config and search space.
+    model_name : str
+        Key corresponding to the model in the YAML file.
+
+    Returns
+    -------
+    base_params : dict
+        Fixed model parameters from YAML.
+    search_space : dict
+        Hyperparameter search space definition for Optuna.
+    """
+
     with open(config_path) as f:
         cfg = yaml.safe_load(f)
     model_cfg = cfg[model_name]

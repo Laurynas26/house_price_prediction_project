@@ -3,7 +3,7 @@ import numpy as np
 from src.features.feature_engineering import feature_engineering_cv as fe_cv
 from src.features.data_prep_for_modelling.data_preparation import (
     load_features_config,
-    load_geo_config,  # <-- 👈 add here
+    load_geo_config,
 )
 
 
@@ -13,6 +13,28 @@ def prepare_base_data(
     model_name: str,
     extended_fe: bool = True,
 ):
+    """
+    Prepare base features and target for CV or training.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input raw dataset.
+    features_config : str
+        YAML path with features and target definition.
+    model_name : str
+        Model key used in YAML.
+    extended_fe : bool
+        If True, include extra columns for extended feature engineering.
+
+    Returns
+    -------
+    X_full : pd.DataFrame
+        Feature dataframe ready for modeling.
+    y_full : pd.Series
+        Target column.
+    """
+
     features, target, _, _ = load_features_config(features_config, model_name)
     df_copy = df.copy()
 
@@ -36,7 +58,9 @@ def prepare_base_data(
     cols_to_keep = [c for c in features + extra_cols if c in df_copy.columns]
     missing_cols = [c for c in features if c not in df_copy.columns]
     if missing_cols:
-        raise KeyError(f"The following required features are missing: {missing_cols}")
+        raise KeyError(
+            f"The following required features are missing: {missing_cols}"
+        )
 
     X_full = df_copy[cols_to_keep].replace("N/A", np.nan).fillna(0)
     y_full = df_copy[target]
@@ -73,7 +97,9 @@ def prepare_fold_features(
         X_val,
         use_extended_features=use_extended_features,
         include_distance=True,
-        include_amenities=(amenities_df is not None and amenity_radius_map is not None),
+        include_amenities=(
+            amenities_df is not None and amenity_radius_map is not None
+        ),
         amenities_df=amenities_df,
         amenity_radius_map=amenity_radius_map,
         geo_cache_file=geo_cache_file,

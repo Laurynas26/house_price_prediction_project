@@ -74,17 +74,14 @@ class MLFlowLogger:
                     metrics_to_log[k] = float(v)
 
         with mlflow.start_run(run_name=model_name):
-            # Log model
             if use_xgb_train:
                 mlflow.xgboost.log_model(model, artifact_path=folder_name)
             else:
                 mlflow.sklearn.log_model(model, artifact_path=folder_name)
 
-            # Log metrics
             for metric_name, value in metrics_to_log.items():
                 mlflow.log_metric(metric_name, value)
 
-            # Log parameters
             if use_xgb_train:
                 if params:
                     mlflow.log_params(params)

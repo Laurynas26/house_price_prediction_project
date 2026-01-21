@@ -26,40 +26,38 @@ def unified_objective(
     enable_cache_save: bool = False,
 ) -> float:
     """
-    Objective function for Optuna hyperparameter optimization with leakage-safe
-    K-Fold cross-validation and fold-wise feature engineering.
+    Optuna objective function with leakage-safe K-Fold cross-validation
+    and fold-wise feature engineering.
 
-    Parameters
-    ----------
-    use_extended_features : bool
-        If True, perform extended fold-wise feature engineering.
-    use_geo_amenities : bool
-        If True, load geo/amenities from YAML and include them in
-        feature expansion.
+    - Hyperparameters are sampled from YAML-defined search spaces
+    - Feature engineering is re-fitted per fold to prevent leakage
+    - Supports baseline and extended feature sets
+    - Supports optional geo/amenities enrichment
+
+    Returns
+    -------
+    float
+        Mean validation RMSE across CV folds (lower is better).
     """
 
-    # 1️⃣ Load model config and suggest trial parameters
-    model_params, fit_params, search_space = load_model_config_and_search_space(
-        model_config, model_name
+    model_params, fit_params, search_space = (
+        load_model_config_and_search_space(model_config, model_name)
     )
     model_params, fit_params = suggest_params_from_space(
         trial, model_params, fit_params, search_space
     )
 
-    # 2️⃣ Base data prep
     X_full, y_full = prepare_base_data(
         df, features_config, model_name, extended_fe=use_extended_features
     )
 
-    # Optional log-transform on target
     target_transform = np.log1p if use_log else None
     inverse_transform = np.expm1 if use_log else None
 
-    # 3️⃣ K-Fold CV
     kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
     val_rmse_list = []
 
-    for fold, (train_idx, val_idx) in enumerate(kf.split(X_full), 1):
+    for fold, (train_idx, val_idx) in enumerate(kf.split(X_full), start=1):
         X_train, X_val = (
             X_full.iloc[train_idx].copy(),
             X_full.iloc[val_idx].copy(),
@@ -88,7 +86,7 @@ def unified_objective(
                 prepare_fold_features(
                     X_train,
                     X_val,
-                    features_config=features_config,  # 👈 YAML-based configs
+                    features_config=features_config,
                     use_extended_features=True,
                     enable_cache_save=enable_cache_save,
                 )
@@ -96,19 +94,19 @@ def unified_objective(
                 else prepare_fold_features(
                     X_train,
                     X_val,
-                    features_config=None,  # 👈 no geo config loaded
+                    features_config=None,
                     use_extended_features=True,
                     enable_cache_save=enable_cache_save,
                 )
             )
 
-        # 4️⃣ Initialize evaluator
+        # Initialize evaluator
         evaluator = ModelEvaluator(
             target_transform=target_transform,
             inverse_transform=inverse_transform,
         )
 
-        # 5️⃣ Train & evaluate
+        # Train & evaluate
         if "xgb" in model_name.lower():
             _, _, _, _, results = evaluator.evaluate(
                 model=None,
