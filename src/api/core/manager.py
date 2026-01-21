@@ -35,10 +35,23 @@ S3_PREFIX = os.environ.get("S3_PREFIX")
 
 class PipelineManager:
     """
-    Singleton manager for real estate pipeline:
-    - Loads and runs preprocessing pipeline
-    - Loads trained model
-    - Handles scraping → preprocessing → prediction in a consistent way
+    High-level inference orchestrator.
+
+    NOTE:
+    This class intentionally combines preprocessing and inference
+    responsibilities to simplify deployment and testing.
+
+    Inference correctness depends ONLY on:
+    - trained model
+    - model feature schema
+
+    Preprocessing pipeline is optional and used for:
+    - feature extraction and preprocessing (with feature engineering)
+    - diagnostics
+    - logging
+
+    This may be split in the future if multiple models or pipelines
+    are introduced.
     """
 
     _instance = None
