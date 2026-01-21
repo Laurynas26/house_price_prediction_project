@@ -12,13 +12,20 @@ import botocore
 
 class CacheManager:
     """
-    General-purpose cache manager for storing and loading intermediate
-    pipeline data (e.g., preprocessed or feature-engineered datasets).
+    Environment-aware cache manager for intermediate ML artifacts.
+
+    This cache is intended for:
+    - training-time preprocessing outputs
+    - feature-engineering intermediates
+    - reusable, deterministic pipeline artifacts
+
+    It is NOT a model registry and does not participate in
+    training–inference schema enforcement.
 
     Features:
-    - Nested YAML config hashing for scoped cache
-    - Automatic upload to S3
-    - Auto-download from S3 if cache not present locally
+    - Config-hash–scoped cache keys
+    - Optional S3 backing
+    - Lambda-safe local storage (/tmp)
     """
 
     def __init__(
@@ -57,7 +64,9 @@ class CacheManager:
             return None
         if scope:
             if not isinstance(config, dict):
-                raise TypeError(f"Expected dict for config, got {type(config)}")
+                raise TypeError(
+                    f"Expected dict for config, got {type(config)}"
+                )
             return config.get(scope, config)
         return config
 
@@ -86,7 +95,9 @@ class CacheManager:
         if local_matches:
             return local_matches[-1]
         if self.is_lambda and self.prepackaged_cache_dir:
-            container_matches = sorted(self.prepackaged_cache_dir.glob(pattern))
+            container_matches = sorted(
+                self.prepackaged_cache_dir.glob(pattern)
+            )
             if container_matches:
                 return container_matches[-1]
         fallback = self.cache_dir / f"{name}_{hash_key}.pkl"
