@@ -241,20 +241,15 @@ config/model_config.yaml
 and
 src/model/approved_model.yaml.
 
-### 4. Dockerization and CI/CD
-
-I have a Dockerfile at root used to build a container for AWS Lambda. I do not build the container locally. I build it using AWS CodeBuild.
-
-For AWS Lambda, we have buildspec.yml at root for creation.
-I am also using
-
-### 5. Design Principles
+### 4. Design Principles
 
 - Config over hardcoding
 - Explicit pipelines over magic
 - Notebooks for discovery, scripts for execution
 - Reproducibility first
 - Production realism without over-engineering
+
+
 
 ### Notes
 
