@@ -17,8 +17,16 @@ Optional extensions (future):
     --model [linear|rf|xgb]
 """
 
+# ------------------------------------------------------------------
+# Paths and Imports
+# ------------------------------------------------------------------
 import os
+import sys
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
 import yaml
 import numpy as np
 import pandas as pd
@@ -40,15 +48,9 @@ from src.model.utils import load_model_config_and_search_space
 # ------------------------------------------------------------------
 ROOT = Path(__file__).resolve().parents[1]
 
-PREPROCESSING_CONFIG_PATH = (
-    ROOT
-    / "house_price_prediction_project"
-    / "config"
-    / "preprocessing_config.yaml"
-)
-MODEL_CONFIG_PATH = (
-    ROOT / "house_price_prediction_project" / "config" / "model_config.yaml"
-)
+PREPROCESSING_CONFIG_PATH = ROOT / "config" / "preprocessing_config.yaml"
+MODEL_CONFIG_PATH = ROOT / "config" / "model_config.yaml"
+
 
 DATA_PATH = ROOT / "data" / "parsed_json" / "*.json"
 
