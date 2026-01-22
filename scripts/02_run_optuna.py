@@ -14,8 +14,15 @@ Usage:
     python scripts/run_optuna.py
 """
 
-import os
+# ------------------------------------------------------------------
+# Paths and Imports
+# ------------------------------------------------------------------
+import sys
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
 import yaml
 import optuna
 from functools import partial
@@ -25,20 +32,10 @@ from src.data_loading.preprocessing.preprocessing import preprocess_df
 from src.data_loading.preprocessing.imputation import impute_missing_values
 from src.model.objectives_optuna import unified_objective
 
-# ------------------------------------------------------------------
-# Paths
-# ------------------------------------------------------------------
-ROOT = Path(__file__).resolve().parents[1]
 
-PREPROCESSING_CONFIG_PATH = (
-    ROOT
-    / "house_price_prediction_project"
-    / "config"
-    / "preprocessing_config.yaml"
-)
-MODEL_CONFIG_PATH = (
-    ROOT / "house_price_prediction_project" / "config" / "model_config.yaml"
-)
+PREPROCESSING_CONFIG_PATH = ROOT / "config" / "preprocessing_config.yaml"
+MODEL_CONFIG_PATH = ROOT / "config" / "model_config.yaml"
+
 
 DATA_PATH = ROOT / "data" / "parsed_json" / "*.json"
 

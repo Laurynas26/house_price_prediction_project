@@ -11,7 +11,7 @@ import xgboost as xgb
 class ModelEvaluator:
     def __init__(
         self,
-        metrics: dict[str, callable] | None,
+        metrics: dict[str, callable] | None = None,
         target_transform=None,
         inverse_transform=None,
         huber_delta=1.0,

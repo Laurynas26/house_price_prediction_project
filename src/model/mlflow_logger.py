@@ -2,6 +2,8 @@ import mlflow
 import mlflow.sklearn
 import mlflow.xgboost
 import time
+import os
+from pathlib import Path
 
 
 class MLFlowLogger:
@@ -17,7 +19,12 @@ class MLFlowLogger:
         Whether to log metrics with the `_trans` suffix.
     """
 
-    def __init__(self, log_transformed_metrics: bool = False):
+    def __init__(
+        self,
+        log_transformed_metrics: bool = False,
+        experiment_name: str = "house_price_prediction",
+        tracking_uri: str | None = None,
+    ):
         """
         Initialize MLFlowLogger.
 
@@ -27,6 +34,14 @@ class MLFlowLogger:
             If True, logs transformed metrics (with `_trans` suffix).
         """
         self.log_transformed_metrics = log_transformed_metrics
+        if tracking_uri is None:
+            tracking_uri = "logs/mlruns"
+
+        os.makedirs(Path(tracking_uri) / ".trash", exist_ok=True)
+
+        tracking_uri = Path(tracking_uri).resolve().as_uri()
+        mlflow.set_tracking_uri(tracking_uri)
+        mlflow.set_experiment(experiment_name)
 
     def log_model(
         self,
