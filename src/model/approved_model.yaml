@@ -1,0 +1,12 @@
+model_source: notebook
+production_model_name: XGB_Optuna_LogTransformed_feature_eng_best
+
+decision_reason:
+  - smaller train-test gap
+  - more stable validation curves
+  - less overfitting risk
+
+approved_by: Laurynas
+approved_at: 2025-11-22
+
+## model_config.yaml right now sets the model name. Could use first 4 scripts otherwise, plus load_production_model.py, to change the behavior if desired.
