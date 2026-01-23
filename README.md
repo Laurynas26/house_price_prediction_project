@@ -1,8 +1,14 @@
 # 🏠 House Price Prediction Project
 
-An end-to-end machine learning system for predicting residential property prices in Amsterdam. Covers **data collection, preprocessing, feature engineering, model training, hyperparameter tuning, model selection, production-ready model loading, API, and Vite+React frontend**.
+An end-to-end machine learning system for predicting residential property prices in Amsterdam, built to mirror a realistic applied ML workflow—from data collection and experimentation to production-ready inference.
 
-The project evolves from exploratory notebooks into a **modular, reproducible, production-oriented codebase**, preserving experimentation history and decision-making transparency.
+The project evolves from exploratory notebooks into a **modular, reproducible, production-oriented codebase**, with a strong emphasis on **transparent model selection, train–inference parity, and decision traceability**.
+
+It covers **data collection, preprocessing, feature engineering, model training, hyperparameter tuning, production model selection, inference API, and a Vite+React frontend**.
+
+
+**Motivation:**
+The project was initiated to independently estimate residential property values and assess how listing prices compare to model-driven valuations, using publicly available listing information.
 
 ---
 
@@ -36,8 +42,18 @@ Exploratory analysis is performed in notebooks, later **refactored into scripts 
 
 ---
 
+## ⚠️ Data Disclaimer
+
+- All data is collected from Funda.nl for **educational and research purposes only**.
+- **Do not redistribute raw scraped data**.
+- Tools and explanation of how to collect data are shared, but the data itself is not shared.
+- This project **does not endorse commercial scraping** or usage outside personal learning.
+
+---
+
 ## 🗂️ Repository Structure
 
+```text
 house_price_prediction_project/
 │
 ├── config/
@@ -51,7 +67,7 @@ house_price_prediction_project/
 │ └── mlruns/ # MLflow tracking
 │
 ├── notebooks/
-│ └── [02_modelling.ipynb](notebooks/02_modelling.ipynb)
+│ └── [01_modelling_main.ipynb](notebooks/01_modelling_main.ipynb)
 │
 ├── scripts/
 │ ├── [run_optuna.py](scripts/run_optuna.py)
@@ -60,7 +76,7 @@ house_price_prediction_project/
 │ └── [load_production_model.py](scripts/load_production_model.py)
 │
 ├── src/
-│ ├── scraper/ # Data collection
+│ ├── scraper/ # Data collection (Web scraping)
 │ ├── data_loading/ # Parsing & preprocessing
 │ ├── features/ # Feature engineering
 │ ├── model/ # Training, evaluation, MLflow
@@ -71,7 +87,7 @@ house_price_prediction_project/
 ├── frontend/ # Vite + React frontend
 ├── scrape_funda_url_for_data.py
 └── README.md
-
+```
 ---
 
 ## 🔍 Data Collection (`src/scraper`)
@@ -83,6 +99,7 @@ house_price_prediction_project/
 
 > `scrape_funda_url_for_data.py` is a utility script for generating listing URLs.
 > Not part of production inference, but useful for retraining or exploration.
+> There is a README.md file for this folder going deeper.
 
 ---
 
@@ -120,6 +137,7 @@ Benefits:
 - Minimal code duplication
 
 > `inference_meta.pkl` ensures production predictions align with training-time feature schema.
+> There is a README.md file for this folder going deeper.
 
 ---
 
@@ -142,6 +160,7 @@ Benefits:
 - Local tracking in `logs/mlruns`
 
 > Note: ModelEvaluator handles metrics for train/validation/test splits, target transformations, and early stopping. MLflow logging ensures reproducibility.
+> ModelEvaluator ensures all training and evaluation metrics are consistent, while MLflow provides a transparent experiment history.
 
 ---
 
@@ -193,11 +212,13 @@ Ensures deterministic loading and clear audit trail.
 - Lightweight inference layer
 - Designed for backend or frontend consumption
 - Decoupled from training logic
+> There is a README.md file for this folder going deeper (src/api/core).
 
 ### `src/aws_lambda`
 - AWS Lambda-compatible wrapper
 - Lazy pipeline initialization for fast cold-start
 - Serverless deployment
+> There is a README.md file for this folder going deeper.
 
 ### `frontend/`
 - Vite + React application consuming prediction API
@@ -209,11 +230,12 @@ Ensures deterministic loading and clear audit trail.
 - npm install
 - npm run dev
 
-
+I did not push to github node modules or build output. Nor the secrets/api keys.
 ---
 
 ## 🖼 Pipeline Diagram
 
+```text
 Funda.nl URLs
 │
 ▼
@@ -239,7 +261,7 @@ Inference API / AWS Lambda (src/api + aws_lambda)
 │
 ▼
 Frontend (Vite + React)
-
+```
 
 ---
 
