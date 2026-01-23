@@ -320,9 +320,16 @@ Pipeline: Scraper → Feature Pipeline → Training Scripts → MLflow → Produ
 
 Included to improve reproducibility, testing, and deployment, though the system can also run locally without them.
 
-### 6. Tests
+### 6. 🧪 Testing
 
-- Tests exist in the tests/ folder
+The project includes targeted unit and integration tests focusing on:
+- Preprocessing correctness
+- Feature pipeline stability
+- Production model loading
+- API inference behavior
+
+Tests are designed to validate *contracts and invariants*, not model performance.
+
 
 ### 📬 Notes
 
