@@ -292,6 +292,10 @@ Pipeline: Scraper → Feature Pipeline → Training Scripts → MLflow → Produ
 
 Included to improve reproducibility, testing, and deployment, though the system can also run locally without them.
 
+### 6. Tests
+
+- Tests exist in the tests/ folder
+
 ### 📬 Notes
 
 - System scales without rewriting core logic
