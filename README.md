@@ -230,7 +230,7 @@ Ensures deterministic loading and clear audit trail.
 - npm install
 - npm run dev
 
-I did not push to github node modules or build output. Nor the secrets/api keys.
+> I did not push to github node modules or build output. Nor the secrets/api keys.
 ---
 
 ## 🖼 Pipeline Diagram
