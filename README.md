@@ -1,24 +1,38 @@
 # 🏠 House Price Prediction Project
 
-An end-to-end machine learning system for predicting residential property prices in Amsterdam, covering **data collection, preprocessing, feature engineering, model training, hyperparameter tuning, model selection, production-ready model loading, API, and Vite+React frontend**.
+An end-to-end machine learning system for predicting residential property prices in Amsterdam. Covers **data collection, preprocessing, feature engineering, model training, hyperparameter tuning, model selection, production-ready model loading, API, and Vite+React frontend**.
 
-The project intentionally evolves from exploratory notebooks into a **modular, reproducible, and production-oriented codebase**, while preserving experimentation history and decision-making transparency.
+The project evolves from exploratory notebooks into a **modular, reproducible, production-oriented codebase**, preserving experimentation history and decision-making transparency.
+
+---
+
+## ⭐ Key Features / Highlights
+
+- Config-driven preprocessing and feature engineering
+- Leakage-safe, fold-wise cross-validation
+- Support for baseline and extended/engineered features
+- Hyperparameter optimization with Optuna for XGBoost, Random Forest, and Linear Regression
+- Unified evaluation interface (`ModelEvaluator`) for train/val/test metrics
+- MLflow integration for experiment tracking, metrics, hyperparameters, and model artifacts
+- Explicit production model selection with audit trail (`approved_model.yaml`)
+- Serverless inference with AWS Lambda and lazy pipeline initialization
+- Vite + React frontend for prediction consumption
 
 ---
 
 ## 📌 Project Overview
 
-This repository implements a complete applied ML workflow:
+The repository implements a complete applied ML workflow:
 
-1. **Web scraping** of real-estate listings from Funda.nl
+1. **Web scraping** of [Funda.nl](https://www.funda.nl) listings
 2. **Config-driven preprocessing & feature engineering**
-3. **Model benchmarking and hyperparameter tuning** (Optuna)
-4. **Experiment tracking & model versioning** (MLflow)
+3. **Model benchmarking & hyperparameter tuning** ([Optuna](https://optuna.org))
+4. **Experiment tracking & model versioning** ([MLflow](https://mlflow.org))
 5. **Explicit production model selection**
 6. **Model loading for inference**
 7. **Deployment interfaces** (API / AWS Lambda / Frontend)
 
-Exploratory analysis was performed in notebooks and later **refactored into scripts and reusable modules**.
+Exploratory analysis is performed in notebooks, later **refactored into scripts and reusable modules**.
 
 ---
 
@@ -28,22 +42,22 @@ house_price_prediction_project/
 │
 ├── config/
 │ ├── preprocessing_config.yaml
-│ ├── model_config.yaml
+│ └── model_config.yaml
 │
 ├── data/
 │ └── parsed_json/ # Parsed listing-level data
 │
 ├── logs/
-│ └── mlruns/ # MLflow tracking directory
+│ └── mlruns/ # MLflow tracking
 │
 ├── notebooks/
-│ └── 02_modelling.ipynb # Exploration & model comparison
+│ └── [02_modelling.ipynb](notebooks/02_modelling.ipynb)
 │
 ├── scripts/
-│ ├── run_optuna.py
-│ ├── train_best_model.py
-│ ├── select_and_train_best_model.py
-│ └── load_production_model.py
+│ ├── [run_optuna.py](scripts/run_optuna.py)
+│ ├── [train_best_model.py](scripts/train_best_model.py)
+│ ├── [select_and_train_best_model.py](scripts/select_and_train_best_model.py)
+│ └── [load_production_model.py](scripts/load_production_model.py)
 │
 ├── src/
 │ ├── scraper/ # Data collection
@@ -55,134 +69,121 @@ house_price_prediction_project/
 │ └── aws_lambda/ # Lambda deployment
 │
 ├── frontend/ # Vite + React frontend
-│
-├── scrape_funda_url_for_data.py # Helper scraping script
-│
+├── scrape_funda_url_for_data.py
 └── README.md
-
 
 ---
 
 ## 🔍 Data Collection (`src/scraper`)
 
 - Modular, reusable web scraping components
-- Separation between:
-  - URL discovery
-  - HTML parsing
-  - Data extraction
+- Separation between URL discovery, HTML parsing, and data extraction
 - Rate-limit and failure tolerant
 - Outputs structured JSON
 
-### Notes
-`scrape_funda_url_for_data.py` is a **utility script** used to generate and scrape listing URLs.
-It is **not part of the production ML pipeline**. But can be included if we would need retraining or for other reasons.
+> `scrape_funda_url_for_data.py` is a utility script for generating listing URLs.
+> Not part of production inference, but useful for retraining or exploration.
 
 ---
 
 ## 🧼 Data Loading & Preprocessing (`src/data_loading`)
 
 Responsibilities:
-- Loading raw JSON listings
-- Schema normalization
-- Type coercion
-- Missing value handling
-- Preprocessing of raw dat
-- CacheManager class for cache management
 
-Key principles:
+- Loading raw JSON listings
+- Schema normalization & type coercion
+- Missing value handling
+- Preprocessing for modeling
+- Cache management (`CacheManager`)
+
+Principles:
+
 - No model assumptions
 - Fully config-driven
-- Reusable across experiments and inference
+- Reusable across experiments & inference
+
+> Note: On AWS Lambda, the preprocessing pipeline uses lazy initialization and can load a cached geolocation and amenities dataset for fast inference, avoiding large cold-start overheads.
 
 ---
 
 ## 🧠 Feature Engineering (`src/features`)
 
 - Centralized feature preparation logic
-- Supports:
-  - baseline features
-  - extended / engineered features
-- CV-aware train / validation / test splits
+- Supports baseline and extended/engineered features
+- CV-aware train/validation/test splits
 - Behavior controlled via `model_config.yaml`
 
-This allows:
-- fair feature comparisons
-- reproducible experiments
-- minimal code duplication
+Benefits:
+
+- Fair feature comparisons
+- Reproducible experiments
+- Minimal code duplication
+
+> `inference_meta.pkl` ensures production predictions align with training-time feature schema.
 
 ---
 
 ## 🤖 Modeling & Evaluation (`src/model`)
 
 ### ModelEvaluator
-A unified evaluation interface supporting:
-- sklearn estimators
-- `xgboost.train` with early stopping
-- train / validation / test metrics
-- optional target transformation (e.g. log-scale)
+- Unified interface supporting sklearn & XGBoost
+- Train / validation / test metrics
+- Optional target transformation (e.g., log-scale)
+- Early-stopping support for XGBoost
 
 ### Hyperparameter Optimization
-- Optuna objectives abstracted into reusable functions
-- Supports:
-  - Random Forest
-  - XGBoost
-  - XGBoost with early stopping
-- Integrated with MLflow logging
+- Optuna objectives with leakage-safe K-Fold CV
+- Supports Random Forest, Linear Regression, and XGBoost
+- Fold-wise feature engineering & optional geo/amenities enrichment
 
 ### MLflow Logging
-Centralized logging via `MLFlowLogger`:
-- Metrics
-- Hyperparameters
-- Model artifacts
-- File-based local tracking (`logs/mlruns`)
+- Centralized logging via `MLFlowLogger`
+- Metrics, hyperparameters, model artifacts
+- Local tracking in `logs/mlruns`
+
+> Note: ModelEvaluator handles metrics for train/validation/test splits, target transformations, and early stopping. MLflow logging ensures reproducibility.
 
 ---
 
 ## 📊 Experimentation & Model Selection
 
 ### Notebooks
-`notebooks/01_modelling_main.ipynb` contains:
-- Model benchmarking
-- Feature addition experiments
-- Hyperparameter tuning
-- Overfitting analysis
-- Final model comparison
+- [`notebooks/01_modelling_main.ipynb`](notebooks/01_modelling_main.ipynb)
+  - Model benchmarking
+  - Feature addition experiments
+  - Hyperparameter tuning
+  - Overfitting analysis
+  - Final model comparison
 
-Other notebooks have self-explanatory names. Most are for some personal tests.
+Other notebooks are exploratory or testing.
+- [`notebooks/06_trying_new_feature_expansion.ipynb`](notebooks/06_trying_new_feature_expansion.ipynb) generates `df_with_lat_lon_encoded.csv`, `amsterdam_amenities.csv`, etc. If new data is scraped, these must be regenerated.
 
 ### Scripts
 
 | Script | Purpose |
-|------|--------|
-| `run_optuna.py` | Hyperparameter tuning |
-| `train_best_model.py` | Train fixed-config models |
-| `select_and_train_best_model.py` | Select & retrain best MLflow run |
-| `load_production_model.py` | Load production model |
+|--------|---------|
+| [`run_optuna.py`](scripts/run_optuna.py) | Hyperparameter tuning |
+| [`train_best_model.py`](scripts/train_best_model.py) | Train fixed-config models |
+| [`select_and_train_best_model.py`](scripts/select_and_train_best_model.py) | Select & retrain production model |
+| [`load_production_model.py`](scripts/load_production_model.py) | Load production model |
 
 ---
 
 ## 🧪 Model Selection Strategy
 
-The **production model is not chosen solely by best test metric**. It comes from one of the models in the 01_modelling_main.ipynb notebook.
+- Production model is **not chosen solely by test metric**
+- Selection criteria:
+  - Test performance (RMSE, MAE, MAPE)
+  - Train–test gap
+  - Stability across folds
+  - Overfitting behavior
 
-Selection criteria include:
-- Test performance
-- Train–test gap
-- Stability across folds
-- Overfitting behavior
+- Explicitly defined in:
+  - `config/model_config.yaml`
+  - `src/model/approved_model.yaml`
+  - `notebooks/01_modelling_main.ipynb`
 
-The chosen production model is explicitly defined in last line of:
-
-config/model_config.yaml
-
-and
-
-src/model/approved_model.yaml.
-
-This ensures:
-- Deterministic loading
-- No accidental retraining
-- Clear audit trail
+Ensures deterministic loading and clear audit trail.
 
 ---
 
@@ -193,53 +194,85 @@ This ensures:
 - Designed for backend or frontend consumption
 - Decoupled from training logic
 
-Some code is deprecated in src/api. That is mentioned in the .py files docstring at the top if deprecated.
-
 ### `src/aws_lambda`
-- AWS Lambda-compatible inference wrapper
-- Enables serverless deployment
+- AWS Lambda-compatible wrapper
+- Lazy pipeline initialization for fast cold-start
+- Serverless deployment
 
 ### `frontend/`
-- Vite + React application
-- Consumes prediction API
+- Vite + React application consuming prediction API
 - Separate from ML training code
 
 ---
 
-## ▶️ How to Run Locally
+## 🖼 Pipeline Diagram
+
+Funda.nl URLs
+│
+▼
+Scraper (src/scraper)
+│
+▼
+Data Loading & Preprocessing (src/data_loading)
+│
+▼
+Feature Engineering (src/features)
+│
+▼
+Model Training & Tuning (src/model + Optuna)
+│
+▼
+MLflow Logging & Selection
+│
+▼
+Production Model (model_config.yaml/approved_model.yaml)
+│
+▼
+Inference API / AWS Lambda (src/api + aws_lambda)
+│
+▼
+Frontend (Vite + React)
+
+
+---
+
+## ▶️ Running Locally
 
 ### 1. Install dependencies
-
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Get a list of funda urls
+### 2. Prepare data
 
-Put the list of funda urls in "config/house_pages_scraped.txt". Example url: https://www.funda.nl/detail/koop/amsterdam/appartement-bilderdijkkade-75-b/43179082/
+Place Funda URLs in config/house_pages_scraped.txt
 
-I have scraped funda sitemap for all the existing urls from Amsterdam. Doing that would give someone trying recreate the most data.
+Example URL:
+https://www.funda.nl/detail/koop/amsterdam/appartement-bilderdijkkade-75-b/43179082/
 
-### 3. Now there is a choice, either the automated model selection, or exploration. I will outline both.
+### 3. Choose workflow
 
-#### 3.a. Exploration (my followed path and here highly prefered due to outlier issue)
+#### a) Exploration (recommended)
 
-Run the notebooks/01_modelling_main.ipynb to get the best model with best hyperparameters. It is an orchestrator of the code from src. But there is more exploration and trade-off explanation.
+- Run notebooks/01_modelling_main.ipynb
+- Discover outliers & feature trade-offs
+- Identify best production model
 
-#### 3.b. Automated
+#### b) Automated
 
-To have automated best test RMSE model, one can run scripts 01 to 04.
+- Run scripts sequentially:
+- 01_train_baselines.py
+- 02_run_optuna.py
+- 03_select_and_train_best_model.py
+- 04_load_production_model.py
 
-01_train_baselines.py trains baselines for comparison.
-02_run_optuna.py runs hyperparamater tuning for xgboost and random forest models.
-03_select_and_train_best_model.py selects and trains production model.
-04_load_production_model.py loads production model.
-
-If this path is used, for now, one has to change the explanation and documentation of production model in:
+Update production model references in:
 
 config/model_config.yaml
-and
-src/model/approved_model.yaml.
+
+src/model/approved_model.yaml
+
+Pipeline: Scraper → Feature Pipeline → Training Scripts → MLflow → Production Model → Lambda API
 
 ### 4. Design Principles
 
@@ -249,16 +282,25 @@ src/model/approved_model.yaml.
 - Reproducibility first
 - Production realism without over-engineering
 
+### 5. 🧰 CI/CD & Dev Tools
 
+- .github/workflows/python-tests.yml contains CI/CD pipelines for automated testing, linting and formatting
+- Dockerfile for containerized execution (used in AWS Lambda)
+- .pre-commit-config.yaml for code quality enforcement
+- requirements-dev.txt for development dependencies
+- buildspec.yaml for AWS build pipelines
 
-### Notes
+Included to improve reproducibility, testing, and deployment, though the system can also run locally without them.
 
-CI/CD and cloud orchestration are intentionally minimal
+### 6. Tests
 
-The system is designed to scale without rewriting core logic
+- Tests exist in the tests/ folder
 
-This repository prioritizes clarity, traceability, and correctness
+### 📬 Notes
+
+- System scales without rewriting core logic
+- Prioritizes clarity, traceability, and correctness
 
 ### Contact
 
-For questions, collaboration, or discussion — feel free to reach out.
+For questions, collaboration, or discussion, feel free to reach out.
