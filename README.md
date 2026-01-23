@@ -203,6 +203,13 @@ Ensures deterministic loading and clear audit trail.
 - Vite + React application consuming prediction API
 - Separate from ML training code
 
+> Note: To run the Vite+React frontend locally, run the following three commands in the terminal:
+
+- cd frontend
+- npm install
+- npm run dev
+
+
 ---
 
 ## 🖼 Pipeline Diagram
