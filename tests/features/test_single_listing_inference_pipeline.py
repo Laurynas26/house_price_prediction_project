@@ -1,30 +1,45 @@
-from src.features.preprocessing_pipeline import PreprocessingPipeline
-from pathlib import Path
+import pandas as pd
 import numpy as np
+from pathlib import Path
+from src.features.preprocessing_pipeline import PreprocessingPipeline
 
 
 def test_single_listing_feature_schema_matches_training():
+    # --- Minimal fake dataset ---
+    df = pd.DataFrame(
+        {
+            "size_num": [50, 80],
+            "rooms": [2, 3],
+            "has_garden": [1, 0],
+            "price": [200000, 400000],  # include target
+        }
+    )
 
+    # --- Minimal config ---
     config_paths = {
         "preprocessing": {
             "drop_raw": True,
-            "numeric_cols": [],
+            "numeric_cols": ["size_num", "rooms", "has_garden"],
             "imputation": {},
         }
     }
 
     pipeline = PreprocessingPipeline(
         config_paths=config_paths,
-        raw_json_pattern="data/parsed_json/*.json",
+        raw_json_pattern=None,  # disable JSON reading
         model_config_path=Path("config/model_config.yaml"),
         model_name="xgboost_extended",
         load_cache=False,
         save_cache=False,
     )
 
+    # --- Inject fake data ---
+    pipeline._load_raw_data = lambda: df
+
+    # --- Run pipeline ---
     pipeline.run(smart_cache=False)
 
-    # --- Minimal realistic listing ---
+    # --- Minimal realistic listing for inference ---
     listing = {
         "price": "€ 400.000",
         "size": "80 m²",

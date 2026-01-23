@@ -37,9 +37,16 @@ experiment_name: dummy_experiment
     mock_model.feature_names = ["size_num", "rooms", "has_garden"]
     mock_model.predict.return_value = np.array([np.log1p(350000)])
 
+    # --- Patch both model loader and geo config loader ---
     with patch(
         "src.api.core.manager.load_production_model",
         return_value=mock_model,
+    ), patch(
+        "src.features.feature_engineering.location_feature_enrichment.load_geo_config",
+        return_value=("dummy_geo.pkl", None, None),
+    ), patch(
+        "src.features.feature_engineering.location_feature_enrichment.load_cache",
+        return_value={},
     ):
         manager = PipelineManager()
         manager._instance = None  # reset singleton for test

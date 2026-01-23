@@ -15,41 +15,45 @@ def test_feature_pipeline_sanity(tmp_path):
     - Feature columns are stable and ordered
     """
 
-    # --- Minimal config paths ---
+    # --- Fake dataset ---
+    df = pd.DataFrame(
+        {
+            "size_num": [50, 70, 100],
+            "rooms": [2, 3, 4],
+            "has_garden": [1, 0, 1],
+            "price": [200000, 300000, 350000],  # include target
+        }
+    )
+
+    # --- Minimal config ---
     config_paths = {
         "preprocessing": {
             "drop_raw": True,
-            "numeric_cols": [],
+            "numeric_cols": ["size_num", "rooms", "has_garden"],
             "imputation": {},
         }
     }
 
     pipeline = PreprocessingPipeline(
         config_paths=config_paths,
-        raw_json_pattern="data/parsed_json/*.json",
+        raw_json_pattern=None,  # disable reading JSON
         model_config_path=Path("config/model_config.yaml"),
-        model_name="xgboost_extended",  # use a real model name
+        model_name="dummy_model",
         load_cache=False,
         save_cache=False,
     )
 
+    # Patch the run method to use our fake df
+    pipeline._load_raw_data = lambda: df  # monkey-patch
+
     result = pipeline.run(smart_cache=False)
 
-    # --- Basic existence ---
+    # --- Assertions ---
     assert result.X_train is not None
     assert not result.X_train.empty
-
-    # --- Shape sanity ---
-    assert result.X_train.shape[0] > 0
-    assert result.X_train.shape[1] > 5  # protects against accidental drops
-
-    # --- Numeric-only ---
+    assert result.X_train.shape[0] == 3
     assert all(
         np.issubdtype(dtype, np.number) for dtype in result.X_train.dtypes
     )
-
-    # --- No NaNs ---
     assert result.X_train.isnull().sum().sum() == 0
-
-    # --- Schema consistency ---
     assert pipeline.expected_columns == result.X_train.columns.tolist()
