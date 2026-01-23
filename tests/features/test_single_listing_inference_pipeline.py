@@ -1,5 +1,6 @@
 from src.features.preprocessing_pipeline import PreprocessingPipeline
 from pathlib import Path
+import numpy as np
 
 
 def test_single_listing_feature_schema_matches_training():

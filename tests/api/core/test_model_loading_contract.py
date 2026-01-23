@@ -1,6 +1,5 @@
 import numpy as np
 from unittest.mock import MagicMock, patch
-from pathlib import Path
 
 from src.api.core.manager import PipelineManager
 
