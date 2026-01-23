@@ -2,10 +2,9 @@
 
 An end-to-end machine learning system for predicting residential property prices in Amsterdam, built to mirror a realistic applied ML workflow—from data collection and experimentation to production-ready inference.
 
-The project evolves from exploratory notebooks into a **modular, reproducible, production-oriented codebase**, with a strong emphasis on **transparent model selection, train–inference parity, and decision traceability**.
+The project evolves from exploratory notebooks into a *modular, reproducible, production-oriented codebase*, with a strong emphasis on *transparent model selection, train–inference parity, and decision traceability*.
 
-It covers **data collection, preprocessing, feature engineering, model training, hyperparameter tuning, production model selection, inference API, and a Vite+React frontend**.
-
+It covers *data collection, preprocessing, feature engineering, model training, hyperparameter tuning, production model selection, inference API, and a Vite+React frontend*.
 
 The project was motivated by a practical question: _how accurately can market listing prices be explained by structured property features, and where do listings appear over- or under-valued?_
 
@@ -30,15 +29,15 @@ The project was motivated by a practical question: _how accurately can market li
 
 The repository implements a complete applied ML workflow:
 
-1. **Web scraping** of [Funda.nl](https://www.funda.nl) listings
-2. **Config-driven preprocessing & feature engineering**
-3. **Model benchmarking & hyperparameter tuning** ([Optuna](https://optuna.org))
-4. **Experiment tracking & model versioning** ([MLflow](https://mlflow.org))
-5. **Explicit production model selection**
-6. **Model loading for inference**
-7. **Deployment interfaces** (API / AWS Lambda / Frontend)
+1. Web scraping of [Funda.nl](https://www.funda.nl) listings
+2. Config-driven preprocessing & feature engineering
+3. Model benchmarking & hyperparameter tuning ([Optuna](https://optuna.org))
+4. Experiment tracking & model versioning ([MLflow](https://mlflow.org))
+5. Explicit production model selection
+6. Model loading for inference
+7. Deployment interfaces (API / AWS Lambda / Frontend)
 
-Exploratory analysis is performed in notebooks, later **refactored into scripts and reusable modules**.
+Exploratory analysis is performed in notebooks, later *refactored into scripts and reusable modules*.
 
 ---
 
@@ -141,7 +140,7 @@ Benefits:
 
 ---
 
-## 🤖 Modeling & Evaluation (`src/model`)
+## Modeling & Evaluation (`src/model`)
 
 ### ModelEvaluator
 - Unified interface supporting sklearn & XGBoost
@@ -190,7 +189,7 @@ Other notebooks are exploratory or testing.
 
 ## 🧪 Model Selection Strategy
 
-- Production model is **not chosen solely by test metric**
+- Production model is *not chosen solely by test metric*
 - Selection criteria:
   - Test performance (RMSE, MAE, MAPE)
   - Train–test gap
