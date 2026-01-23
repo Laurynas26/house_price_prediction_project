@@ -7,8 +7,8 @@ The project evolves from exploratory notebooks into a **modular, reproducible, p
 It covers **data collection, preprocessing, feature engineering, model training, hyperparameter tuning, production model selection, inference API, and a Vite+React frontend**.
 
 
-**Motivation:**
-The project was initiated to independently estimate residential property values and assess how listing prices compare to model-driven valuations, using publicly available listing information.
+The project was motivated by a practical question: _how accurately can market listing prices be explained by structured property features, and where do listings appear over- or under-valued?_
+
 
 ---
 
