@@ -320,9 +320,48 @@ Pipeline: Scraper → Feature Pipeline → Training Scripts → MLflow → Produ
 
 Included to improve reproducibility, testing, and deployment, though the system can also run locally without them.
 
-### 6. Tests
+### 6. 🧪 Testing
 
-- Tests exist in the tests/ folder
+The project includes targeted unit tests focused on inference safety and correctness.
+
+Tests cover:
+- preprocessing correctness and edge cases
+- feature schema stability and enforcement
+- model loading contracts and failure modes
+- API-level inference behavior
+
+Tests validate *contracts and invariants*, not model performance.
+
+#### 🧪 Testing Philosophy
+
+This project intentionally focuses on *contract-based testing* rather than metric-based testing.
+
+The primary goal of the test suite is to ensure that:
+- preprocessing behaves deterministically
+- feature schemas remain stable between training and inference
+- production models can be safely loaded
+- inference fails loudly when assumptions are violated
+
+#### Why this matters
+
+In ML systems, silent failures are more dangerous than bad metrics.
+A model can produce numbers even when:
+- features are misaligned
+- preprocessing logic drifts
+- metadata is missing
+
+These tests protect the **correctness of inference**, not the quality of predictions.
+
+#### What is intentionally not tested
+
+- Model accuracy or business performance
+- Absolute prediction values
+- MLflow internals or cloud infrastructure behavior
+
+These aspects are validated through:
+- exploratory notebooks
+- MLflow experiment tracking
+- manual inspection during model selection
 
 ### 📬 Notes
 
