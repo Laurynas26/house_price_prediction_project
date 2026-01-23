@@ -53,6 +53,7 @@ Exploratory analysis is performed in notebooks, later **refactored into scripts 
 
 ## 🗂️ Repository Structure
 
+```text
 house_price_prediction_project/
 │
 ├── config/
@@ -86,7 +87,7 @@ house_price_prediction_project/
 ├── frontend/ # Vite + React frontend
 ├── scrape_funda_url_for_data.py
 └── README.md
-
+```
 ---
 
 ## 🔍 Data Collection (`src/scraper`)
@@ -234,6 +235,7 @@ I did not push to github node modules or build output. Nor the secrets/api keys.
 
 ## 🖼 Pipeline Diagram
 
+```text
 Funda.nl URLs
 │
 ▼
@@ -259,7 +261,7 @@ Inference API / AWS Lambda (src/api + aws_lambda)
 │
 ▼
 Frontend (Vite + React)
-
+```
 
 ---
 
