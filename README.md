@@ -83,6 +83,7 @@ house_price_prediction_project/
 
 > `scrape_funda_url_for_data.py` is a utility script for generating listing URLs.
 > Not part of production inference, but useful for retraining or exploration.
+> There is a README.md file for this folder going deeper.
 
 ---
 
@@ -120,6 +121,7 @@ Benefits:
 - Minimal code duplication
 
 > `inference_meta.pkl` ensures production predictions align with training-time feature schema.
+> There is a README.md file for this folder going deeper.
 
 ---
 
@@ -193,11 +195,13 @@ Ensures deterministic loading and clear audit trail.
 - Lightweight inference layer
 - Designed for backend or frontend consumption
 - Decoupled from training logic
+> There is a README.md file for this folder going deeper (src/api/core).
 
 ### `src/aws_lambda`
 - AWS Lambda-compatible wrapper
 - Lazy pipeline initialization for fast cold-start
 - Serverless deployment
+> There is a README.md file for this folder going deeper.
 
 ### `frontend/`
 - Vite + React application consuming prediction API
@@ -209,7 +213,7 @@ Ensures deterministic loading and clear audit trail.
 - npm install
 - npm run dev
 
-
+We did not push to github node modules or build output. Nor the secrets/api keys.
 ---
 
 ## 🖼 Pipeline Diagram
