@@ -4,6 +4,16 @@ import pickle
 
 from src.api.core.manager import PipelineManager
 
+GEO_PATCH = (
+    "src.features.feature_engineering."
+    "location_feature_enrichment.enrich_with_geolocation"
+)
+
+AMENITY_PATCH = (
+    "src.features.feature_engineering."
+    "location_feature_enrichment.enrich_with_amenities"
+)
+
 
 def test_pipeline_manager_model_loading_contract(tmp_path):
     """
@@ -50,10 +60,10 @@ def test_pipeline_manager_model_loading_contract(tmp_path):
         "src.api.core.manager.load_production_model",
         return_value=mock_model,
     ), patch(
-        "src.features.feature_engineering.location_feature_enrichment.enrich_with_geolocation",
+        GEO_PATCH,
         side_effect=lambda df, **kw: (df, kw.get("geo_meta")),
     ), patch(
-        "src.features.feature_engineering.location_feature_enrichment.enrich_with_amenities",
+        AMENITY_PATCH,
         side_effect=lambda df, **kw: (df, kw.get("amenity_meta")),
     ):
 
