@@ -322,46 +322,42 @@ Included to improve reproducibility, testing, and deployment, though the system 
 
 ### 6. 🧪 Testing
 
-The project includes targeted unit tests focused on inference safety and correctness.
+The project includes targeted unit tests that focus on inference safety, preprocessing correctness, and API-level behavior.
 
 Tests cover:
-- preprocessing correctness and edge cases
-- feature schema stability and enforcement
-- model loading contracts and failure modes
-- API-level inference behavior
 
-Tests validate *contracts and invariants*, not model performance.
+- Preprocessing functions and edge cases, including neighborhood details parsing.
+
+- API-level model prediction logic (mocked), ensuring:
+
+1. Feature schema enforcement
+2. Proper handling of missing or extra features
+3. Failures when the model is misconfigured or uninitialized
+
+> Tests validate contracts and invariants, not model performance.
 
 #### 🧪 Testing Philosophy
 
-This project intentionally focuses on *contract-based testing* rather than metric-based testing.
+This project emphasizes contract-based testing rather than accuracy metrics. The goal is to ensure that:
 
-The primary goal of the test suite is to ensure that:
-- preprocessing behaves deterministically
-- feature schemas remain stable between training and inference
-- production models can be safely loaded
-- inference fails loudly when assumptions are violated
+- Preprocessing behaves deterministically.
+- Feature schemas remain stable between training and inference.
+- API-level inference behaves safely.
+- Failures in assumptions (e.g., missing features, uninitialized model) are caught explicitly.
 
-#### Why this matters
-
-In ML systems, silent failures are more dangerous than bad metrics.
-A model can produce numbers even when:
-- features are misaligned
-- preprocessing logic drifts
-- metadata is missing
-
-These tests protect the **correctness of inference**, not the quality of predictions.
+> This approach ensures correctness of inference, which is more critical than metrics for safe deployment.
 
 #### What is intentionally not tested
 
-- Model accuracy or business performance
-- Absolute prediction values
-- MLflow internals or cloud infrastructure behavior
+- Model accuracy, performance metrics, or business outcomes.
+- Full end-to-end integration with real file system or MLflow artifacts.
+- MLflow internals, cloud infrastructure, or deployment behavior.
 
 These aspects are validated through:
-- exploratory notebooks
-- MLflow experiment tracking
-- manual inspection during model selection
+
+- Exploratory notebooks.
+- MLflow experiment tracking.
+- Manual inspection during model selection.
 
 ### 📬 Notes
 
