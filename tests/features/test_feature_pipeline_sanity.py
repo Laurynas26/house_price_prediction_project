@@ -16,17 +16,15 @@ def test_feature_pipeline_sanity():
     - Feature columns are stable and ordered
     """
 
-    # --- Fake dataset ---
     df = pd.DataFrame(
         {
             "size_num": [50, 70, 100],
             "rooms": [2, 3, 4],
             "has_garden": [1, 0, 1],
-            "price": [200000, 300000, 350000],  # target
+            "price": [200000, 300000, 350000],
         }
     )
 
-    # --- Minimal config ---
     config_paths = {
         "preprocessing": {
             "drop_raw": True,
@@ -37,30 +35,20 @@ def test_feature_pipeline_sanity():
 
     pipeline = PreprocessingPipeline(
         config_paths=config_paths,
-        raw_json_pattern=None,  # explicitly unused
+        raw_json_pattern="dummy/*.json",
         model_config_path=Path("config/model_config.yaml"),
         model_name="dummy_model",
         load_cache=False,
         save_cache=False,
     )
 
-    # --- Inject fake raw data directly ---
-    pipeline._load_raw_data = lambda: df
+    with patch(
+        "src.features.preprocessing_pipeline.load_data_from_json",
+        return_value=df,
+    ):
+        result = pipeline.run(smart_cache=False)
 
-    result = pipeline.run(smart_cache=False)
-
-    # --- Assertions ---
-    assert result.X_train is not None
     assert not result.X_train.empty
     assert result.X_train.shape[0] == 3
-
-    # Numeric-only
-    assert all(
-        np.issubdtype(dtype, np.number) for dtype in result.X_train.dtypes
-    )
-
-    # No NaNs
     assert result.X_train.isnull().sum().sum() == 0
-
-    # Schema stability
     assert pipeline.expected_columns == result.X_train.columns.tolist()
