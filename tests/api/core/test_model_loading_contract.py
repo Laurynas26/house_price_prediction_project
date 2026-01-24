@@ -42,7 +42,7 @@ experiment_name: dummy_experiment
         "src.api.core.manager.load_production_model",
         return_value=mock_model,
     ), patch(
-        "src.features.feature_engineering.location_feature_enrichment.load_geo_config",
+        "src.features.data_prep_for_modelling.data_preparation.load_geo_config",
         return_value=("dummy_geo.pkl", None, None),
     ), patch(
         "src.features.feature_engineering.location_feature_enrichment.load_cache",

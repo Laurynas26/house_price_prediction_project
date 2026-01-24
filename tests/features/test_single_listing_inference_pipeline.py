@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 from pathlib import Path
+from unittest.mock import patch
+
 from src.features.preprocessing_pipeline import PreprocessingPipeline
 
 
@@ -11,7 +13,7 @@ def test_single_listing_feature_schema_matches_training():
             "size_num": [50, 80],
             "rooms": [2, 3],
             "has_garden": [1, 0],
-            "price": [200000, 400000],  # include target
+            "price": [200000, 400000],  # target
         }
     )
 
@@ -26,18 +28,19 @@ def test_single_listing_feature_schema_matches_training():
 
     pipeline = PreprocessingPipeline(
         config_paths=config_paths,
-        raw_json_pattern=None,  # disable JSON reading
+        raw_json_pattern="dummy/*.json",
         model_config_path=Path("config/model_config.yaml"),
         model_name="xgboost_extended",
         load_cache=False,
         save_cache=False,
     )
 
-    # --- Inject fake data ---
-    pipeline._load_raw_data = lambda: df
-
-    # --- Run pipeline ---
-    pipeline.run(smart_cache=False)
+    # --- Train-time pipeline run ---
+    with patch(
+        "src.data_loading.data_loading.data_loader.load_data_from_json",
+        return_value=df,
+    ):
+        pipeline.run(smart_cache=False)
 
     # --- Minimal realistic listing for inference ---
     listing = {
