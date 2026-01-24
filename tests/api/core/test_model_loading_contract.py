@@ -49,9 +49,9 @@ def test_pipeline_manager_model_loading_contract(tmp_path):
     (config_dir / "preprocessing_config.yaml").write_text(
         """
     geo_feature_exp:
-    geo_cache_file: dummy.csv
-    amenities_file: dummy_amenities.csv
-    amenity_radius_map: {}
+        geo_cache_file: dummy.csv
+        amenities_file: dummy_amenities.csv
+        amenity_radius_map: {}
     """
     )
 
