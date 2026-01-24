@@ -1,13 +1,19 @@
 import pandas as pd
 import numpy as np
 from pathlib import Path
-from unittest.mock import patch
 
 from src.features.preprocessing_pipeline import PreprocessingPipeline
 
 
 def test_single_listing_feature_schema_matches_training():
-    # --- Minimal fake dataset ---
+    """
+    Contract test:
+    - Single-listing inference produces exactly the same feature schema
+      as training-time features
+    - Output is numeric, 1-row, and NaN-free
+    """
+
+    # --- Fake training dataset ---
     df = pd.DataFrame(
         {
             "size_num": [50, 80],
@@ -28,21 +34,18 @@ def test_single_listing_feature_schema_matches_training():
 
     pipeline = PreprocessingPipeline(
         config_paths=config_paths,
-        raw_json_pattern="dummy/*.json",
+        raw_json_pattern=None,  # explicitly unused
         model_config_path=Path("config/model_config.yaml"),
         model_name="xgboost_extended",
         load_cache=False,
         save_cache=False,
     )
 
-    # --- Train-time pipeline run ---
-    with patch(
-        "src.data_loading.data_loading.data_loader.load_data_from_json",
-        return_value=df,
-    ):
-        pipeline.run(smart_cache=False)
+    # --- Inject training data directly ---
+    pipeline._load_raw_data = lambda: df
+    pipeline.run(smart_cache=False)
 
-    # --- Minimal realistic listing for inference ---
+    # --- Minimal inference listing ---
     listing = {
         "price": "€ 400.000",
         "size": "80 m²",
@@ -57,7 +60,10 @@ def test_single_listing_feature_schema_matches_training():
         "address": "Teststraat 1",
     }
 
-    X_inf = pipeline.transform_single_for_inference(listing, drop_target=True)
+    X_inf = pipeline.transform_single_for_inference(
+        listing,
+        drop_target=True,
+    )
 
     # --- Schema contract ---
     assert list(X_inf.columns) == pipeline.expected_columns

@@ -1,7 +1,6 @@
 import numpy as np
 from pathlib import Path
 import pandas as pd
-from unittest.mock import patch
 
 from src.features.preprocessing_pipeline import PreprocessingPipeline
 
@@ -38,19 +37,17 @@ def test_feature_pipeline_sanity():
 
     pipeline = PreprocessingPipeline(
         config_paths=config_paths,
-        raw_json_pattern="dummy/*.json",  # value irrelevant now
+        raw_json_pattern=None,  # explicitly unused
         model_config_path=Path("config/model_config.yaml"),
         model_name="dummy_model",
         load_cache=False,
         save_cache=False,
     )
 
-    # Patch the real loader
-    with patch(
-        "src.data_loading.data_loading.data_loader.load_data_from_json",
-        return_value=df,
-    ):
-        result = pipeline.run(smart_cache=False)
+    # --- Inject fake raw data directly ---
+    pipeline._load_raw_data = lambda: df
+
+    result = pipeline.run(smart_cache=False)
 
     # --- Assertions ---
     assert result.X_train is not None

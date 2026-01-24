@@ -1,5 +1,6 @@
 import numpy as np
 from unittest.mock import MagicMock, patch
+import pickle
 
 from src.api.core.manager import PipelineManager
 
@@ -12,44 +13,51 @@ def test_pipeline_manager_model_loading_contract(tmp_path):
     - Prediction path is callable
     """
 
-    # --- Fake inference_meta.pkl ---
+    # --- Reset singleton safely ---
+    PipelineManager._instance = None
+
+    # --- Fake inference_meta.pkl (shape-accurate) ---
     inference_meta = {
-        "meta": {},
+        "meta": {
+            "geo_meta": {
+                "cache_file": "dummy.csv",
+                "postal_code_centroids": {},
+                "neighborhood_centroids": {},
+            },
+            "amenity_meta": {
+                "amenity_radius_map": {},
+                "encoded_columns": [],
+            },
+        },
         "expected_columns": ["size_num", "rooms", "has_garden"],
     }
 
     config_dir = tmp_path
     (config_dir / "inference_meta.pkl").write_bytes(
-        __import__("pickle").dumps(inference_meta)
+        pickle.dumps(inference_meta)
     )
 
-    # --- Minimal configs ---
     (config_dir / "preprocessing_config.yaml").write_text("dummy: true")
     (config_dir / "model_config.yaml").write_text(
-        """
-production_model_name: dummy_model
-experiment_name: dummy_experiment
-"""
+        "production_model_name: dummy_model"
     )
 
     # --- Mock model ---
     mock_model = MagicMock()
-    mock_model.feature_names = ["size_num", "rooms", "has_garden"]
     mock_model.predict.return_value = np.array([np.log1p(350000)])
 
-    # --- Patch both model loader and geo config loader ---
     with patch(
         "src.api.core.manager.load_production_model",
         return_value=mock_model,
     ), patch(
-        "src.features.data_prep_for_modelling.data_preparation.load_geo_config",
-        return_value=("dummy_geo.pkl", None, None),
+        "src.features.feature_engineering.location_feature_enrichment.enrich_with_geolocation",
+        side_effect=lambda df, **kw: (df, kw.get("geo_meta")),
     ), patch(
-        "src.features.feature_engineering.location_feature_enrichment.load_cache",
-        return_value={},
+        "src.features.feature_engineering.location_feature_enrichment.enrich_with_amenities",
+        side_effect=lambda df, **kw: (df, kw.get("amenity_meta")),
     ):
+
         manager = PipelineManager()
-        manager._instance = None  # reset singleton for test
         manager.initialize(str(config_dir))
 
         # --- Assertions ---
