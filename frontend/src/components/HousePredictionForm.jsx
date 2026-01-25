@@ -1,6 +1,26 @@
 import { useState } from "react";
 
+const FACILITY_LABELS = {
+  mechanische_ventilatie: "Mechanical ventilation",
+  natuurlijke_ventilatie: "Natural ventilation",
+  tv_kabel: "Cable TV",
+  glasvezelkabel: "Fiber internet",
+  lift: "Elevator",
+  schuifpui: "Sliding doors",
+  frans_balkon: "French balcony",
+  buitenzonwering: "Outdoor sun shades",
+  zonnepanelen: "Solar panels",
+  airconditioning: "Air conditioning",
+  domotica: "Smart home (domotics)",
+  sauna: "Sauna",
+  zwembad: "Swimming pool",
+};
+
 export default function HousePredictionForm() {
+  const [prediction, setPrediction] = useState(null);
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
+
   const [formData, setFormData] = useState({
     size: "",
     contribution_vve: "",
@@ -14,6 +34,9 @@ export default function HousePredictionForm() {
     status: "Onder bod",
     roof_type: "Flat",
     ownership_type: "Owner",
+    bedrooms: "",
+    year_of_construction: "",
+    located_on: "",
 
     // amenities
     facilities: {
@@ -54,35 +77,49 @@ export default function HousePredictionForm() {
   const preparePayload = () => {
     const facilities = Object.entries(formData.facilities)
       .filter(([_, v]) => v)
-      .map(([k]) => k);
-
-    const outdoor_features = [];
-    if (formData.balcony) outdoor_features.push("balcony");
+      .map(([k]) => k)
+      .join(","); // safer than array if model expects string
 
     return {
       manual_input: {
-        size: Number(formData.size),
-        contribution_vve: Number(formData.contribution_vve),
-        external_storage: Number(formData.external_storage),
-        nr_rooms: Number(formData.nr_rooms),
-        bathrooms: Number(formData.bathrooms),
-        toilets: Number(formData.toilets),
-        postal_code: formData.postal_code,
+        size: Number(formData.size) || null,
+        contribution_vve: Number(formData.contribution_vve) || null,
+        external_storage: Number(formData.external_storage) || null,
+        nr_rooms: Number(formData.nr_rooms) || null,
+        bathrooms: Number(formData.bathrooms) || null,
+        toilets: Number(formData.toilets) || null,
+        bedrooms: Number(formData.bedrooms) || null,
+        year_of_construction: Number(formData.year_of_construction) || null,
+
+        postal_code: formData.postal_code || null,
         location: formData.location,
         energy_label: formData.energy_label,
         status: formData.status,
         roof_type: formData.roof_type,
         ownership_type: formData.ownership_type,
+        located_on: Number(formData.located_on) || null,
+
         facilities,
-        outdoor_features,
+
+        outdoor_features: {
+          balcony: formData.balcony,
+          backyard: formData.backyard,
+        },
+
+        balcony: formData.balcony ? "yes" : "no",
         backyard: formData.backyard ? "yes" : "no",
       },
     };
   };
 
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     const payload = preparePayload();
+
+    setLoading(true);
+    setPrediction(null);
+    setError(null);
 
     try {
       const response = await fetch(
@@ -95,37 +132,146 @@ export default function HousePredictionForm() {
       );
 
       const result = await response.json();
+
       if (result.success) {
-        alert("Predicted price: €" + Math.round(result.prediction));
+        setPrediction(Math.round(result.prediction));
       } else {
-        alert("Error: " + result.error);
+        setError(result.error || "Prediction failed");
       }
     } catch (err) {
-      alert("Failed to fetch prediction");
+      setError("Failed to fetch prediction");
       console.error(err);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <h2 className="text-xl font-bold">Basic info</h2>
+      <label className="block">
+        <span className="text-sm text-gray-600">Size (m²)</span>
+        <input
+          type="number"
+          name="size"
+          value={formData.size}
+          onChange={handleChange}
+          required
+          className="w-full"
+        />
+      </label>
+      <label className="block">
+        <span className="text-sm text-gray-600">Rooms</span>
+        <input
+          type="number"
+          name="nr_rooms"
+          value={formData.nr_rooms}
+          onChange={handleChange}
+          required
+          className="w-full"
+        />
+      </label>
+      <label className="block">
+        <span className="text-sm text-gray-600">Bathrooms</span>
+        <input
+          type="number"
+          name="bathrooms"
+          value={formData.bathrooms}
+          onChange={handleChange}
+          required
+          className="w-full"
+        />
+      </label>
+      <label className="block">
+        <span className="text-sm text-gray-600">Toilets</span>
+        <input
+          type="number"
+          name="toilets"
+          value={formData.toilets}
+          onChange={handleChange}
+          required
+          className="w-full"
+        />
+      </label>
+      <label className="block">
+        <span className="text-sm text-gray-600">VvE contribution (€)</span>
+        <input
+          type="number"
+          name="contribution_vve"
+          value={formData.contribution_vve}
+          onChange={handleChange}
+          required
+          className="w-full"
+        />
+      </label>
+      <label className="block">
+        <span className="text-sm text-gray-600">External storage (m²)</span>
+        <input
+          type="number"
+          name="external_storage"
+          value={formData.external_storage}
+          onChange={handleChange}
+          required
+          className="w-full"
+        />
+      </label>
+      <label className="block">
+        <span className="text-sm text-gray-600">Postal code</span>
+        <input
+          type="text"
+          name="postal_code"
+          value={formData.postal_code}
+          onChange={handleChange}
+          required
+          className="w-full"
+        />
+      </label>
+      <label className="block">
+        <span className="text-sm text-gray-600">Year of construction</span>
+        <input
+          type="number"
+          name="year_of_construction"
+          value={formData.year_of_construction}
+          onChange={handleChange}
+          className="w-full"
+        />
+      </label>
+      <label className="block">
+        <span className="text-sm text-gray-600">Bedrooms</span>
+        <input
+          type="number"
+          name="bedrooms"
+          value={formData.bedrooms}
+          onChange={handleChange}
+          className="w-full"
+        />
+      </label>
+      <label className="block">
+        <span className="text-sm text-gray-600">Located on (floor)</span>
+        <input
+          type="number"
+          name="located_on"
+          value={formData.located_on}
+          onChange={handleChange}
+          className="w-full"
+        />
+      </label>
 
-      <input type="number" placeholder="Size (m²)" name="size" value={formData.size} onChange={handleChange} required />
-      <input type="number" placeholder="Rooms" name="nr_rooms" value={formData.nr_rooms} onChange={handleChange} required />
-      <input type="number" placeholder="Bathrooms" name="bathrooms" value={formData.bathrooms} onChange={handleChange} />
-      <input type="number" placeholder="Toilets" name="toilets" value={formData.toilets} onChange={handleChange} />
-      <input type="number" placeholder="VvE contribution (€)" name="contribution_vve" value={formData.contribution_vve} onChange={handleChange} />
-      <input type="number" placeholder="External storage (m²)" name="external_storage" value={formData.external_storage} onChange={handleChange} />
-      <input type="text" placeholder="Postal code" name="postal_code" value={formData.postal_code} onChange={handleChange} required />
+
 
       <h2 className="text-xl font-bold">Amenities</h2>
       <div className="grid grid-cols-2 gap-2">
         {Object.keys(formData.facilities).map((k) => (
-          <label key={k}>
-            <input type="checkbox" checked={formData.facilities[k]} onChange={() => handleCheckbox("facilities", k)} />
-            {k.replace(/_/g, " ")}
+          <label key={k} className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={formData.facilities[k]}
+              onChange={() => handleCheckbox("facilities", k)}
+            />
+            {FACILITY_LABELS[k] ?? k.replace(/_/g, " ")}
           </label>
         ))}
+
       </div>
 
       <label>
@@ -147,10 +293,11 @@ export default function HousePredictionForm() {
       </select>
 
       <select name="roof_type" value={formData.roof_type} onChange={handleChange}>
-        <option>Flat</option>
-        <option>Saddle</option>
-        <option>Unknown</option>
+        <option value="Flat">Flat roof</option>
+        <option value="Saddle">Saddle roof</option>
+        <option value="Unknown">Unknown</option>
       </select>
+
 
       <select name="ownership_type" value={formData.ownership_type} onChange={handleChange}>
         <option>Owner</option>
@@ -164,7 +311,27 @@ export default function HousePredictionForm() {
         ))}
       </select>
 
-      <button className="p-2 bg-blue-600 text-white">Predict price</button>
+      <button
+        className="p-2 bg-blue-600 text-white disabled:opacity-50"
+        disabled={loading}
+      >
+        {loading ? "Predicting..." : "Predict price"}
+      </button>
+
+      {prediction && (
+        <div className="mt-4 p-4 bg-green-100 rounded">
+          <p className="text-sm text-gray-600">Estimated price</p>
+          <p className="text-2xl font-bold">
+            € {prediction.toLocaleString()}
+          </p>
+        </div>
+      )}
+
+      {error && (
+        <div className="mt-4 p-4 bg-red-100 text-red-700 rounded">
+          {error}
+        </div>
+      )}
     </form>
   );
 }
